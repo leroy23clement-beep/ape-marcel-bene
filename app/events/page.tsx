@@ -43,7 +43,7 @@ export default async function EventsPage() {
               <span>➕</span> Créer un nouvel événement
             </h2>
 
-            <form action={createEvent} className="grid gap-4 md:grid-cols-2">
+            <form action={createEvent} encType="multipart/form-data" className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Titre</label>
                 <input type="text" name="title" required placeholder="ex: Fête de l'école" className="w-full text-sm p-2.5 rounded-lg border bg-white" />
