@@ -1,13 +1,11 @@
-/** @type {import('next').NextMode} */
-const nextConfig = {
-  typescript: {
-    // Permet de déployer même s'il reste des petites erreurs de typage
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    // Permet d'ignorer les avertissements linter pendant le build
-    ignoreDuringBuilds: true,
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
   },
 };
 
-module.exports = nextConfig;
+export default creativeConfig // (ou garde export default nextConfig selon ton fichier d'origine)
