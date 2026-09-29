@@ -32,7 +32,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
           {/* Logo / Nom */}
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center gap-2 font-bold text-gray-900 text-lg">
-              <span>🎒</span> APE Marcel Béné
+              <img> APE Marcel Béné
             </Link>
           </div>
 
