@@ -72,6 +72,7 @@ export default function EventsPage() {
 
       setImageUrl(data.publicUrl)
     } catch (error: any) {
+      console.error("Erreur upload:", error)
       alert("Erreur lors de l'upload de l'image : " + error.message)
     } finally {
       setUploading(false)
@@ -80,10 +81,11 @@ export default function EventsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("Tentative de soumission du formulaire...")
     setLoading(true)
 
     try {
-      const { error } = await supabase.from('events').insert({
+      console.log("Données envoyées :", {
         title,
         description,
         event_date: eventDate,
@@ -93,20 +95,31 @@ export default function EventsPage() {
         image_url: imageUrl || null,
       })
 
+      const { data, error } = await supabase.from('events').insert({
+        title,
+        description,
+        event_date: eventDate,
+        location,
+        visibility,
+        is_internal: visibility !== 'public',
+        image_url: imageUrl || null,
+      }).select()
+
+      console.log("Réponse Supabase - data:", data, "error:", error)
+
       if (error) throw error
 
       alert("Événement publié avec succès !")
-      // Réinitialiser le formulaire
       setTitle('')
       setEventDate('')
       setLocation('')
       setVisibility('public')
       setDescription('')
       setImageUrl('')
-      // Recharger la liste
       fetchEvents()
     } catch (error: any) {
-      alert("Erreur lors de la publication : " + error.message)
+      console.error("Erreur attrapée dans catch:", error)
+      alert("Erreur lors de la publication : " + (error.message || JSON.stringify(error)))
     } finally {
       setLoading(false)
     }
@@ -273,7 +286,7 @@ export default function EventsPage() {
                     </div>
                   )}
 
-                  {event.description && <p className="text-sm text-gray-600">{event.description}崔</p>}
+                  {event.description && <p className="text-sm text-gray-600">{event.description}</p>}
 
                   <div className="pt-3 border-t flex items-center justify-between">
                     <div className="text-xs text-gray-500">
@@ -289,7 +302,7 @@ export default function EventsPage() {
                         <input type="hidden" name="eventId" value={event.id} />
                         <input
                           type="text"
-                          name="roleNeededs"
+                          name="roleNeeded"
                           placeholder="Ex: Tenue de stand..."
                           className="text-xs px-3 py-1.5 border rounded-lg focus:outline-purple-600 bg-white"
                           required
