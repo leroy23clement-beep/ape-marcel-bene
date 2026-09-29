@@ -1,28 +1,121 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import Image from "next/image";
-import Navbar from "@/components/Navbar";
-import { createEvent, registerVolunteer } from "@/lib/actions/events";
+'use client'
 
-export default async function EventsPage() {
-  const supabase = await createClient();
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import Navbar from '@/components/Navbar'
+import { registerVolunteer } from '@/lib/actions/events'
+import Image from 'next/image'
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+export default function EventsPage() {
+  const supabase = createClient()
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [events, setEvents] = useState<any[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [imageUrl, setImageUrl] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  // Champs du formulaire
+  const [title, setTitle] = useState('')
+  const [eventDate, setEventDate] = useState('')
+  const [location, setLocation] = useState('')
+  const [visibility, setVisibility] = useState('public')
+  const [description, setDescription] = useState('')
 
-  const isBureau = profile?.role && profile.role !== "parent";
-  const canSeeSecretariat = ["president", "secretaire", "vice_secretaire", "admin"].includes(profile?.role ?? "");
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        window.location.href = '/login'
+        return
+      }
+      setUser(user)
 
-  const { data: events } = await supabase
-    .from("events")
-    .select("*, event_volunteers(*)")
-    .order("event_date", { ascending: true });
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      setProfile(profileData)
+
+      fetchEvents()
+    }
+    loadData()
+  }, [])
+
+  const fetchEvents = async () => {
+    const { data: eventsData } = await supabase
+      .from('events')
+      .select('*, event_volunteers(*)')
+      .order('event_date', { ascending: true })
+    setEvents(eventsData || [])
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true)
+      if (!e.target.files || e.target.files.length === 0) return
+
+      const file = e.target.files[0]
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('events-images')
+        .upload(fileName, file)
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage
+        .from('events-images')
+        .getPublicUrl(fileName)
+
+      setImageUrl(data.publicUrl)
+    } catch (error: any) {
+      alert("Erreur lors de l'upload de l'image : " + error.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      const { error } = await supabase.from('events').insert({
+        title,
+        description,
+        event_date: eventDate,
+        location,
+        visibility,
+        is_internal: visibility !== 'public',
+        image_url: imageUrl || null,
+      })
+
+      if (error) throw error
+
+      alert("Événement publié avec succès !")
+      // Réinitialiser le formulaire
+      setTitle('')
+      setEventDate('')
+      setLocation('')
+      setVisibility('public')
+      setDescription('')
+      setImageUrl('')
+      // Recharger la liste
+      fetchEvents()
+    } catch (error: any) {
+      alert("Erreur lors de la publication : " + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const isBureau = profile?.role && profile.role !== 'parent'
+  const canSeeSecretariat = ['president', 'secretaire', 'vice_secretaire', 'admin'].includes(profile?.role ?? '')
+
+  if (!user) return null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,32 +129,54 @@ export default async function EventsPage() {
           </p>
         </header>
 
-        {/* Formulaire d'ajout réservé aux membres du Bureau */}
         {isBureau && (
           <section className="bg-purple-50/50 border border-purple-200 rounded-xl p-5 space-y-4">
             <h2 className="text-lg font-bold text-purple-900 flex items-center gap-2">
               <span>➕</span> Créer un nouvel événement
             </h2>
 
-            <form action={createEvent} encType="multipart/form-data" className="grid gap-4 md:grid-cols-2">
+            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Titre</label>
-                <input type="text" name="title" required placeholder="ex: Fête de l'école" className="w-full text-sm p-2.5 rounded-lg border bg-white" />
+                <input 
+                  type="text" 
+                  value={title} 
+                  onChange={(e) => setTitle(e.target.value)} 
+                  required 
+                  placeholder="ex: Fête de l'école" 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white" 
+                />
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Date et heure</label>
-                <input type="datetime-local" name="event_date" required className="w-full text-sm p-2.5 rounded-lg border bg-white" />
+                <input 
+                  type="datetime-local" 
+                  value={eventDate} 
+                  onChange={(e) => setEventDate(e.target.value)} 
+                  required 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white" 
+                />
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Lieu (optionnel)</label>
-                <input type="text" name="location" placeholder="ex: Cour de l'école" className="w-full text-sm p-2.5 rounded-lg border bg-white" />
+                <input 
+                  type="text" 
+                  value={location} 
+                  onChange={(e) => setLocation(e.target.value)} 
+                  placeholder="ex: Cour de l'école" 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white" 
+                />
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Visibilité</label>
-                <select name="visibility" className="w-full text-sm p-2.5 rounded-lg border bg-white">
+                <select 
+                  value={visibility} 
+                  onChange={(e) => setVisibility(e.target.value)} 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
+                >
                   <option value="public">Public (Tous les parents)</option>
                   <option value="codir">CODIR uniquement</option>
                   {canSeeSecretariat && (
@@ -72,25 +187,40 @@ export default async function EventsPage() {
 
               <div className="md:col-span-2 space-y-1">
                 <label className="text-xs font-medium text-gray-700">Description</label>
-                <input type="text" name="description" placeholder="Détails de l'événement" className="w-full text-sm p-2.5 rounded-lg border bg-white" />
+                <input 
+                  type="text" 
+                  value={description} 
+                  onChange={(e) => setDescription(e.target.value)} 
+                  placeholder="Détails de l'événement" 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white" 
+                />
               </div>
 
-              {/* Champ d'upload d'image */}
               <div className="md:col-span-2 space-y-1">
                 <label className="text-xs font-medium text-gray-700">Image de l'événement (optionnel)</label>
-                <input type="file" name="image" accept="image/*" className="w-full text-sm p-2 rounded-lg border bg-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200" />
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageUpload}
+                  className="w-full text-sm p-2 rounded-lg border bg-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200" 
+                />
+                {uploading && <p className="text-xs text-purple-600 mt-1">Téléchargement de l'image en cours...</p>}
+                {imageUrl && <p className="text-xs text-emerald-600 mt-1">✓ Image prête à être publiée</p>}
               </div>
 
               <div className="md:col-span-2 flex justify-end pt-2 border-t border-purple-200">
-                <button type="submit" className="bg-purple-700 hover:bg-purple-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-                  Publier l'événement
+                <button 
+                  type="submit" 
+                  disabled={uploading || loading}
+                  className="bg-purple-700 hover:bg-purple-800 disabled:bg-gray-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+                >
+                  {loading ? "Publication..." : "Publier l'événement"}
                 </button>
               </div>
             </form>
           </section>
         )}
 
-        {/* Liste des événements */}
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-800">Prochains événements</h2>
           {events && events.length > 0 ? (
@@ -132,7 +262,6 @@ export default async function EventsPage() {
                     </span>
                   </div>
 
-                  {/* Affichage de l'image si elle existe */}
                   {event.image_url && (
                     <div className="relative w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100">
                       <Image
@@ -144,7 +273,7 @@ export default async function EventsPage() {
                     </div>
                   )}
 
-                  {event.description && <p className="text-sm text-gray-600">{event.description}</p>}
+                  {event.description && <p className="text-sm text-gray-600">{event.description}崔</p>}
 
                   <div className="pt-3 border-t flex items-center justify-between">
                     <div className="text-xs text-gray-500">
@@ -160,14 +289,14 @@ export default async function EventsPage() {
                         <input type="hidden" name="eventId" value={event.id} />
                         <input
                           type="text"
-                          name="roleNeeded"
+                          name="roleNeededs"
                           placeholder="Ex: Tenue de stand..."
                           className="text-xs px-3 py-1.5 border rounded-lg focus:outline-purple-600 bg-white"
                           required
                         />
                         <button
                           type="submit"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition"
                         >
                           Je participe
                         </button>
@@ -185,5 +314,5 @@ export default async function EventsPage() {
         </section>
       </main>
     </div>
-  );
+  )
 }
