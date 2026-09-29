@@ -21,7 +21,8 @@ export async function createEvent(formData: FormData) {
   // Gestion de l'upload de l'image si un fichier est fourni
   if (imageFile && imageFile.size > 0) {
     const fileExt = imageFile.name.split('.').pop()
-    const fileName = `${Date.now()}-${Math.random().toString(36.substring(2))}.${fileExt}`
+    // Correction de la parenthèse ici :
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
     const filePath = `${fileName}`
 
     const { error: uploadError } = await supabase.storage
