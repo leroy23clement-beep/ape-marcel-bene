@@ -34,10 +34,12 @@ export default async function AdminPage() {
     redirect("/dashboard");
   }
 
-  const { data: members } = await supabase
+  const { data: membersData } = await supabase
     .from("profiles")
     .select("*")
     .order("last_name", { ascending: true });
+
+  const members = (membersData || []) as any[];
 
   return (
     <div className="min-h-screen bg-gray-50">
