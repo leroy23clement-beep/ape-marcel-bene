@@ -43,11 +43,16 @@ export default function EventsPage() {
     loadData()
   }, [])
 
-  const fetchEvents = async () => {
-    const { data: eventsData } = await supabase
+ const fetchEvents = async () => {
+    const { data: eventsData, error } = await supabase
       .from('events')
-      .select('*, event_volunteers(*)')
+      .select('*')
       .order('event_date', { ascending: true })
+      
+    if (error) {
+      console.error("Erreur fetchEvents:", error)
+    }
+    
     setEvents(eventsData || [])
   }
 
