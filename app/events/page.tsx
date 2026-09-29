@@ -79,13 +79,18 @@ export default function EventsPage() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("Tentative de soumission du formulaire...")
+  const handleSubmit = async () => {
+    console.log("Clic sur Publier détecté !")
+    
+    if (!title || !eventDate) {
+      alert("Veuillez remplir au moins le titre et la date.")
+      return
+    }
+
     setLoading(true)
 
     try {
-      console.log("Données envoyées :", {
+      console.log("Envoi des données vers Supabase...", {
         title,
         description,
         event_date: eventDate,
@@ -148,27 +153,26 @@ export default function EventsPage() {
               <span>➕</span> Créer un nouvel événement
             </h2>
 
-            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+            {/* Remplacement du <form> par un simple <div> pour éviter tout blocage natif */}
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700">Titre</label>
+                <label className="text-xs font-medium text-gray-700">Titre *</label>
                 <input 
                   type="text" 
                   value={title} 
                   onChange={(e) => setTitle(e.target.value)} 
-                  required 
                   placeholder="ex: Fête de l'école" 
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white" 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900" 
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700">Date et heure</label>
+                <label className="text-xs font-medium text-gray-700">Date et heure *</label>
                 <input 
                   type="datetime-local" 
                   value={eventDate} 
                   onChange={(e) => setEventDate(e.target.value)} 
-                  required 
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white" 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900" 
                 />
               </div>
 
@@ -179,7 +183,7 @@ export default function EventsPage() {
                   value={location} 
                   onChange={(e) => setLocation(e.target.value)} 
                   placeholder="ex: Cour de l'école" 
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white" 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900" 
                 />
               </div>
 
@@ -188,7 +192,7 @@ export default function EventsPage() {
                 <select 
                   value={visibility} 
                   onChange={(e) => setVisibility(e.target.value)} 
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
                 >
                   <option value="public">Public (Tous les parents)</option>
                   <option value="codir">CODIR uniquement</option>
@@ -205,7 +209,7 @@ export default function EventsPage() {
                   value={description} 
                   onChange={(e) => setDescription(e.target.value)} 
                   placeholder="Détails de l'événement" 
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white" 
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900" 
                 />
               </div>
 
@@ -215,7 +219,7 @@ export default function EventsPage() {
                   type="file" 
                   accept="image/*" 
                   onChange={handleImageUpload}
-                  className="w-full text-sm p-2 rounded-lg border bg-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200" 
+                  className="w-full text-sm p-2 rounded-lg border bg-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200 text-gray-900" 
                 />
                 {uploading && <p className="text-xs text-purple-600 mt-1">Téléchargement de l'image en cours...</p>}
                 {imageUrl && <p className="text-xs text-emerald-600 mt-1">✓ Image prête à être publiée</p>}
@@ -223,14 +227,15 @@ export default function EventsPage() {
 
               <div className="md:col-span-2 flex justify-end pt-2 border-t border-purple-200">
                 <button 
-                  type="submit" 
+                  type="button" 
+                  onClick={handleSubmit}
                   disabled={uploading || loading}
-                  className="bg-purple-700 hover:bg-purple-800 disabled:bg-gray-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+                  className="bg-purple-700 hover:bg-purple-800 disabled:bg-gray-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition cursor-pointer"
                 >
                   {loading ? "Publication..." : "Publier l'événement"}
                 </button>
               </div>
-            </form>
+            </div>
           </section>
         )}
 
