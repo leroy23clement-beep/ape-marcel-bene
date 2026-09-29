@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Image from "next/image";
 import { Eye, EyeOff, Loader2, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,6 @@ function LoginForm({ next }: { next?: string }) {
     const formData = new FormData(e.currentTarget);
     setErrors({});
     startTransition(async () => {
-      // En cas de succès, la Server Action redirige : seule une erreur revient ici.
       const res = await signIn(formData);
       if (res && !res.ok) {
         setErrors(res.fieldErrors ?? {});
@@ -211,6 +211,7 @@ export function AuthForms({
     </Tabs>
   );
 }
+
 export default function LoginPage({
   searchParams,
 }: {
@@ -222,6 +223,20 @@ export default function LoginPage({
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6 rounded-xl border bg-card p-6 shadow-lg">
+        
+        {/* === AJOUT DU LOGO ICI === */}
+        <div className="flex flex-col items-center justify-center pb-2">
+          <Image
+            src="/logo.jpg" /* Remplace par le nom de ton fichier image dans le dossier public */
+            alt="Logo APE"
+            width={200}
+            height={200}
+            priority
+            className="rounded-full object-contain"
+          />
+        </div>
+        {/* ========================= */}
+
         <AuthForms defaultTab="login" next={next} hasCallbackError={hasCallbackError} />
       </div>
     </div>
