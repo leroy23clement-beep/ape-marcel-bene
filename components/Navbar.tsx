@@ -54,11 +54,18 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
             })}
           </div>
 
-          {/* Profil & Déconnexion Desktop */}
-          <div className="hidden md:flex items-center space-x-4">
-            <span className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full">
-              {firstName ? `Bonjour, ${firstName}` : userEmail}
-            </span>
+          {/* Profil, Rôle & Déconnexion Desktop */}
+          <div className="hidden md:flex items-center space-x-3">
+            <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
+              <span className="text-xs text-gray-700 font-medium">
+                {firstName ? `Bonjour, ${firstName}` : userEmail}
+              </span>
+              {role && role !== 'parent' && (
+                <span className="text-[10px] font-bold uppercase bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
+                  {role}
+                </span>
+              )}
+            </div>
             <button
               onClick={handleLogout}
               className="text-xs font-medium text-red-600 hover:text-red-800 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition"
@@ -82,8 +89,13 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
       {/* Menu Mobile Déroulant */}
       {isOpen && (
         <div className="md:hidden bg-white border-b px-4 pt-2 pb-4 space-y-2 shadow-lg">
-          <div className="text-xs text-gray-500 pb-2 border-b">
-            Connecté en tant que : <strong className="text-gray-800">{firstName || userEmail}</strong>
+          <div className="flex items-center justify-between text-xs text-gray-500 pb-2 border-b">
+            <span>Connecté : <strong className="text-gray-800">{firstName || userEmail}</strong></span>
+            {role && role !== 'parent' && (
+              <span className="text-[10px] font-bold uppercase bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
+                {role}
+              </span>
+            )}
           </div>
           {navLinks.map((link) => {
             const isActive = pathname === link.href

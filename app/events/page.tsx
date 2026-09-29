@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { registerVolunteer } from '@/lib/actions/events'
-import Image from 'next/image'
 
 export default function EventsPage() {
   const supabase = createClient()
@@ -100,8 +99,6 @@ export default function EventsPage() {
   }
 
   const handleSubmit = async () => {
-    console.log("Clic sur Publier détecté !")
-    
     if (!title || !eventDate) {
       alert("Veuillez remplir au moins le titre et la date.")
       return
@@ -110,16 +107,6 @@ export default function EventsPage() {
     setLoading(true)
 
     try {
-      console.log("Envoi des données vers Supabase...", {
-        title,
-        description,
-        event_date: eventDate,
-        location,
-        visibility,
-        is_internal: visibility !== 'public',
-        image_url: imageUrl || null,
-      })
-
       const { data, error } = await supabase.from('events').insert({
         title,
         description,
@@ -129,8 +116,6 @@ export default function EventsPage() {
         is_internal: visibility !== 'public',
         image_url: imageUrl || null,
       }).select()
-
-      console.log("Réponse Supabase - data:", data, "error:", error)
 
       if (error) throw error
 
@@ -259,9 +244,7 @@ export default function EventsPage() {
         )}
 
         <section className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-800">Prochains événements</h2>
-          </div>
+          <h2 className="text-lg font-semibold text-gray-800">Prochains événements</h2>
           {events && events.length > 0 ? (
             events.map((event) => {
               const isRegistered = event.event_volunteers?.some(
@@ -313,13 +296,13 @@ export default function EventsPage() {
                     </div>
                   </div>
 
+                  {/* Affichage direct de l'image avec une balise img classique */}
                   {event.image_url && (
-                    <div className="relative w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100">
-                      <Image
+                    <div className="w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100">
+                      <img
                         src={event.image_url}
                         alt={event.title}
-                        fill
-                        className="object-cover"
+                        className="w-full h-full object-cover"
                       />
                     </div>
                   )}
