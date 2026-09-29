@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 
 export default function Footer() {
   const [isOpen, setIsOpen] = useState(false)
@@ -55,17 +56,33 @@ export default function Footer() {
                   ape.marcelbene@gmail.com
                 </a>
               </li>
+              <li>
+                {/* Lien vers la page Facebook */}
+                <a 
+                  href="https://www.facebook.com/ape.marcelbene.9/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 transition flex items-center gap-1 font-medium pt-1"
+                >
+                  🌐 Suivez-nous sur Facebook
+                </a>
+              </li>
             </ul>
           </div>
 
-          {/* Bloc 3 : Mentions Légales & RGPD */}
+          {/* Bloc 3 : Mentions Légales & Pages */}
           <div className="space-y-2">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">
               Informations légales
             </h3>
             <p className="text-gray-400 leading-relaxed">
-              Association Loi 1901 à but non lucratif. Les données collectées sur ce site servent uniquement à la gestion interne de l'APE et ne sont jamais retransmises à des tiers.
+              Association Loi 1901 à but non lucratif. Les données collectées sur ce site servent uniquement à la gestion interne de l'APE.
             </p>
+            <div>
+              <Link href="/qui-sommes-nous" className="text-purple-400 hover:text-purple-300 underline underline-offset-2 font-medium">
+                → Qui sommes-nous ?
+              </Link>
+            </div>
             <p className="text-gray-500 text-[11px] pt-2">
               © {new Date().getFullYear()} APE Marcel Béné — Tous droits réservés.
             </p>
