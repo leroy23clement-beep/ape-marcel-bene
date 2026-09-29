@@ -22,13 +22,15 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profiles } = await supabase
-  .from('profiles')
-  .select('*') as { data: any[] | null }
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("*")
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "president" && profile?.role !== "admin") {
+  const profile = profileData as any;
+
+  if (!profile || (profile.role !== "president" && profile.role !== "admin")) {
     redirect("/dashboard");
   }
 
