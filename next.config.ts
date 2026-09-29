@@ -8,4 +8,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default creativeConfig // (ou garde export default nextConfig selon ton fichier d'origine)
+export default nextConfig;
