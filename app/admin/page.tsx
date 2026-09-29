@@ -22,9 +22,9 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
+  const { data: profiles } = await supabase
+  .from('profiles')
+  .select('*') as { data: any[] | null }
     .eq("id", user.id)
     .single();
 
