@@ -43,7 +43,7 @@ export default function EventsPage() {
     loadData()
   }, [])
 
- const fetchEvents = async () => {
+  const fetchEvents = async () => {
     const { data: eventsData, error } = await supabase
       .from('events')
       .select('*')
@@ -54,6 +54,21 @@ export default function EventsPage() {
     }
     
     setEvents(eventsData || [])
+  }
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cet événement ?")) return
+
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', eventId)
+
+    if (error) {
+      alert("Erreur lors de la suppression : " + error.message)
+    } else {
+      fetchEvents()
+    }
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,7 +173,6 @@ export default function EventsPage() {
               <span>➕</span> Créer un nouvel événement
             </h2>
 
-            {/* Remplacement du <form> par un simple <div> pour éviter tout blocage natif */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Titre *</label>
@@ -245,7 +259,9 @@ export default function EventsPage() {
         )}
 
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-800">Prochains événements</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-800">Prochains événements</h2>
+          </div>
           {events && events.length > 0 ? (
             events.map((event) => {
               const isRegistered = event.event_volunteers?.some(
@@ -274,15 +290,27 @@ export default function EventsPage() {
                       {event.location && <p className="text-xs text-gray-500">📍 {event.location}</p>}
                     </div>
 
-                    <span className="text-xs font-semibold px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {new Date(event.event_date).toLocaleDateString("fr-FR", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit"
-                      })}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {new Date(event.event_date).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        })}
+                      </span>
+
+                      {isBureau && (
+                        <button
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium px-2.5 py-1 rounded border border-red-200 hover:bg-red-50 transition cursor-pointer"
+                          title="Supprimer l'événement"
+                        >
+                          🗑️ Supprimer
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {event.image_url && (
