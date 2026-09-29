@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import { createEvent, registerVolunteer } from "@/lib/actions/events";
 
@@ -74,6 +75,12 @@ export default async function EventsPage() {
                 <input type="text" name="description" placeholder="Détails de l'événement" className="w-full text-sm p-2.5 rounded-lg border bg-white" />
               </div>
 
+              {/* Champ d'upload d'image */}
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-xs font-medium text-gray-700">Image de l'événement (optionnel)</label>
+                <input type="file" name="image" accept="image/*" className="w-full text-sm p-2 rounded-lg border bg-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200" />
+              </div>
+
               <div className="md:col-span-2 flex justify-end pt-2 border-t border-purple-200">
                 <button type="submit" className="bg-purple-700 hover:bg-purple-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
                   Publier l'événement
@@ -124,6 +131,18 @@ export default async function EventsPage() {
                       })}
                     </span>
                   </div>
+
+                  {/* Affichage de l'image si elle existe */}
+                  {event.image_url && (
+                    <div className="relative w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100">
+                      <Image
+                        src={event.image_url}
+                        alt={event.title}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  )}
 
                   {event.description && <p className="text-sm text-gray-600">{event.description}</p>}
 

@@ -14,6 +14,31 @@ export async function createEvent(formData: FormData) {
   const event_date = formData.get('event_date') as string
   const location = formData.get('location') as string
   const visibility = formData.get('visibility') as string || 'public'
+  const imageFile = formData.get('image') as File | null
+
+  let image_url = null
+
+  // Gestion de l'upload de l'image si un fichier est fourni
+  if (imageFile && imageFile.size > 0) {
+    const fileExt = imageFile.name.split('.').pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36.substring(2))}.${fileExt}`
+    const filePath = `${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('events-images')
+      .upload(filePath, imageFile)
+
+    if (uploadError) {
+      console.error('Erreur upload image :', uploadError)
+    } else {
+      // Récupérer l'URL publique de l'image
+      const { data: publicUrlData } = supabase.storage
+        .from('events-images')
+        .getPublicUrl(filePath)
+      
+      image_url = publicUrlData.publicUrl
+    }
+  }
 
   const { error } = await supabase.from('events').insert({
     title,
@@ -22,6 +47,7 @@ export async function createEvent(formData: FormData) {
     location,
     visibility,
     is_internal: visibility !== 'public',
+    image_url,
   })
 
   if (error) {
