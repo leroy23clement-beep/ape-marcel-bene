@@ -29,12 +29,13 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     <nav className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          {/* Logo / Nom */}
-          <div className="flex items-center">
-            <Link href="/dashboard" className="flex items-center gap-2 font-bold text-gray-900 text-lg">
-              <img> APE Marcel Béné
-            </Link>
-          </div>
+         {/* Logo / Nom */}
+<div className="flex items-center">
+  <Link href="/dashboard" className="flex items-center gap-2 font-bold text-gray-900 text-lg">
+    <img src="/logo.jpg" alt="Logo APE" className="w-8 h-8 object-contain" />
+    <span>APE Marcel Béné</span>
+  </Link>
+</div>
 
           {/* Navigation Desktop */}
           <div className="hidden md:flex items-center space-x-6">
