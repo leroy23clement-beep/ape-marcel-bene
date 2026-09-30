@@ -5,18 +5,15 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 
-// Gestionnaire des besoins et créneaux (Bureau + Participants)
+// Gestionnaire des besoins et créneaux sous forme de matrice (Tableau croisé)
 function EventNeedsManager({ eventId, isBureau, user, profile }: { eventId: string; isBureau: boolean; user: any; profile: any }) {
   const [needs, setNeeds] = useState<any[]>([])
   const [participants, setParticipants] = useState<any[]>([])
   
   // Formulaire ajout besoin (Bureau)
   const [newNeedTitle, setNewNeedTitle] = useState('')
-  const [needType, setNeedType] = useState('tache') // 'tache' (coche multiple) ou 'creneau' (créneau unique)
-  const [maxSlots, setMaxSlots] = useState(1)
-  
-  // Sélection multiple pour les tâches libres
-  const [selectedNeeds, setSelectedNeeds] = useState<string[]>([])
+  const [timeSlot, setTimeSlot] = useState('') // Ex: 14h00 - 15h00 (Ligne)
+  const [columnName, setColumnName] = useState('') // Ex: Stand Buvette / Maquillage (Colonne)
 
   const supabase = createClient()
 
@@ -32,21 +29,24 @@ function EventNeedsManager({ eventId, isBureau, user, profile }: { eventId: stri
     if (partData) setParticipants(partData)
   }
 
-  // Le bureau ajoute un besoin ou un créneau
+  // Le bureau ajoute un besoin (croisement Colonne / Ligne)
   async function handleAddNeed(e: React.FormEvent) {
     e.preventDefault()
-    if (!newNeedTitle) return
+    if (!columnName || !timeSlot) {
+      alert("Veuillez remplir le poste (colonne) et le créneau (ligne).")
+      return
+    }
 
     const { error } = await supabase.from('event_needs').insert({
       event_id: eventId,
-      title: newNeedTitle,
-      category: needType,
-      max_slots: needType === 'creneau' ? Number(maxSlots) : 1,
+      title: columnName,     // La colonne (ex: Buvette, Maquillage)
+      time_slot: timeSlot,   // La ligne (ex: 14h-15h)
+      max_slots: 1,
     })
 
     if (!error) {
-      setNewNeedTitle('')
-      setMaxSlots(1)
+      setColumnName('')
+      setTimeSlot('')
       fetchNeedsAndParticipants()
     } else {
       alert("Erreur : " + error.message)
@@ -54,36 +54,13 @@ function EventNeedsManager({ eventId, isBureau, user, profile }: { eventId: stri
   }
 
   async function handleDeleteNeed(needId: string) {
-    if (!confirm("Supprimer ce besoin / créneau ?")) return
+    if (!confirm("Supprimer cette case du planning ?")) return
     await supabase.from('event_needs').delete().eq('id', needId)
     fetchNeedsAndParticipants()
   }
 
-  // Inscription aux tâches libres (Cases à cocher multiples)
-  async function handleMultipleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (selectedNeeds.length === 0) {
-      alert("Veuillez cocher au moins une option.")
-      return
-    }
-
-    const userName = profile ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email
-
-    for (const needId of selectedNeeds) {
-      await supabase.from('event_participants').insert({
-        event_id: eventId,
-        user_id: user.id,
-        need_id: needId,
-        user_name: userName,
-      })
-    }
-
-    setSelectedNeeds()
-    fetchNeedsAndParticipants()
-  }
-
-  // Inscription à un créneau unique (ex: Stand de 14h à 15h)
-  async function handleBookCreneau(needId: string) {
+  // Inscription à un créneau (case de la matrice)
+  async function handleBookCell(needId: string) {
     const userName = profile ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email
 
     const { error } = await supabase.from('event_participants').insert({
@@ -102,140 +79,146 @@ function EventNeedsManager({ eventId, isBureau, user, profile }: { eventId: stri
     fetchNeedsAndParticipants()
   }
 
-  const tacheNeeds = needs.filter(n => n.category === 'tache')
-  const creneauNeeds = needs.filter(n => n.category === 'creneau')
   const myParticipations = participants.filter(p => p.user_id === user?.id)
-  const myParticipatingNeedIds = myParticipations.map(p => p.need_id)
+
+  // Extraire les colonnes (postes/activités) et les lignes (créneaux horaires) uniques
+  const columns = Array.from(new Set(needs.map(n => n.title))).filter(Boolean)
+  const rows = Array.from(new Set(needs.map(n => n.time_slot))).filter(Boolean)
 
   return (
     <div className="mt-4 pt-4 border-t border-gray-200 space-y-4 bg-purple-50/30 p-4 rounded-xl">
       <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-        <span>🙋‍♂️</span> Gestion des Bénévoles & Créneaux ({participants.length} inscription(s))
+        <span>🙋‍♂️</span> Planning des Bénévoles ({participants.length} inscription(s))
       </h4>
 
-      {/* ESPACE BUREAU : Définir les besoins ou créneaux */}
+      {/* ESPACE BUREAU : Ajouter une case au tableau */}
       {isBureau && (
-        <form onSubmit={handleAddNeed} className="bg-white p-3 rounded-lg border space-y-3">
-          <p className="text-xs font-bold text-purple-900">➕ Le Bureau : Définir un besoin ou un créneau pour cet événement</p>
+        <form onSubmit={handleAddNeed} className="bg-white p-3 rounded-lg border space-y-3 shadow-xs">
+          <p className="text-xs font-bold text-purple-950">➕ Le Bureau : Ajouter un créneau au tableau croisé</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <input
               type="text"
-              placeholder="Ex: Gâteau / Stand Buvette 14h-16h"
-              value={newNeedTitle}
-              onChange={(e) => setNewNeedTitle(e.target.value)}
-              className="p-2 border rounded text-xs text-gray-900 bg-white sm:col-span-1"
+              placeholder="Poste / Stand (colonne) ex: Buvette"
+              value={columnName}
+              onChange={(e) => setColumnName(e.target.value)}
+              className="p-2 border rounded text-xs text-gray-900 bg-white"
               required
             />
-            <select
-              value={needType}
-              onChange={(e) => setNeedType(e.target.value)}
+            <input
+              type="text"
+              placeholder="Créneau horaire (ligne) ex: 14h00 - 15h00"
+              value={timeSlot}
+              onChange={(e) => setTimeSlot(e.target.value)}
               className="p-2 border rounded text-xs text-gray-900 bg-white"
-            >
-              <option value="tache">🍰 Tâche multiple (ex: Gâteau, Installation)</option>
-              <option value="creneau">🕒 Créneau horaire / Poste unique</option>
-            </select>
+              required
+            />
             <button type="submit" className="bg-purple-700 hover:bg-purple-800 text-white text-xs py-2 rounded font-medium cursor-pointer">
-              Ajouter au planning
+              Ajouter au tableau
             </button>
           </div>
         </form>
       )}
 
-      {/* 1. SECTION TACHES MULTIPLES (ex: Vente de gâteaux, installation...) */}
-      {tacheNeeds.length > 0 && (
-        <form onSubmit={handleMultipleSubmit} className="bg-white p-4 rounded-lg border space-y-3">
-          <p className="text-xs font-bold text-gray-800">✨ Je souhaite participer (vous pouvez en cocher plusieurs) :</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {tacheNeeds.map((need) => {
-              const alreadyDid = myParticipatingNeedIds.includes(need.id)
-              return (
-                <label key={need.id} className={`flex items-center justify-between p-2.5 border rounded-lg text-xs ${alreadyDid ? 'bg-gray-100 opacity-60' : 'bg-gray-50'}`}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      disabled={alreadyDid}
-                      value={need.id}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedNeeds([...selectedNeeds, need.id])
-                        } else {
-                          setSelectedNeeds(selectedNeeds.filter(id => id !== need.id))
-                        }
-                      }}
-                      className="w-4 h-4 text-purple-600 rounded cursor-pointer"
-                    />
-                    <span className="font-semibold text-gray-900">{need.title}</span>
-                  </div>
-                  {alreadyDid && <span className="text-[10px] text-emerald-600 font-bold">Inscrit ✓</span>}
-                  {isBureau && (
-                    <button type="button" onClick={() => handleDeleteNeed(need.id)} className="text-red-500 hover:text-red-700 text-[10px] ml-2">Suppr</button>
-                  )}
-                </label>
-              )
-            })}
-          </div>
-          {tacheNeeds.some(n => !myParticipatingNeedIds.includes(n.id)) && (
-            <button type="submit" className="w-full bg-purple-700 hover:bg-purple-800 text-white text-xs py-2 rounded font-medium transition cursor-pointer">
-              Valider mes choix multiples
-            </button>
-          )}
-        </form>
-      )}
+      {/* MATRICE / TABLEAU CROISE */}
+      {needs.length > 0 && rows.length > 0 && columns.length > 0 ? (
+        <div className="bg-white border rounded-xl p-4 shadow-sm overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b">
+                <th className="p-3 text-left text-xs font-semibold text-gray-600 border-r">Créneaux \ Postes</th>
+                {columns.map((col, idx) => (
+                  <th key={idx} className="p-3 text-center text-xs font-semibold text-purple-900 border-r last:border-r-0">
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((row, rIdx) => (
+                <tr key={rIdx} className="hover:bg-gray-50/50">
+                  <td className="p-3 font-bold text-xs text-gray-800 bg-gray-50/50 border-r whitespace-nowrap">
+                    🕒 {row}
+                  </td>
+                  {columns.map((col, cIdx) => {
+                    // Trouver le besoin correspondant à ce croisement [Poste / Colonne] + [Créneau / Ligne]
+                    const matchingNeed = needs.find(n => n.title === col && n.time_slot === row)
+                    const participation = matchingNeed ? participants.find(p => p.need_id === matchingNeed.id) : null
+                    const isMyBooking = participation && participation.user_id === user?.id
 
-      {/* 2. SECTION CRENEAUX / STANDS (Disparaissent une fois pris si limités) */}
-      {creneauNeeds.length > 0 && (
-        <div className="bg-white p-4 rounded-lg border space-y-3">
-          <p className="text-xs font-bold text-gray-800">🎪 Planning des créneaux et stands (1 bénévole par créneau) :</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {creneauNeeds.map((need) => {
-              const assignedParts = participants.filter(p => p.need_id === need.id)
-              const isTaken = assignedParts.length >= need.max_slots
-              const myBooking = assignedParts.find(p => p.user_id === user?.id)
-
-              return (
-                <div key={need.id} className={`p-3 border rounded-lg text-xs flex justify-between items-center ${isTaken && !myBooking ? 'bg-gray-100 opacity-50' : 'bg-white'}`}>
-                  <div>
-                    <span className="font-bold text-gray-900 block">{need.title}</span>
-                    <span className="text-gray-500 text-[11px]">
-                      {assignedParts.length > 0 ? `Occupé par : ${assignedParts.map(p => p.user_name).join(', ')}` : '🟢 Disponible'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {myBooking ? (
-                      <button onClick={() => handleLeave(myBooking.id)} className="bg-red-50 text-red-600 px-2 py-1 rounded font-medium hover:bg-red-100">
-                        Libérer
-                      </button>
-                    ) : !isTaken ? (
-                      <button onClick={() => handleBookCreneau(need.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded font-medium">
-                        Choisir
-                      </button>
-                    ) : (
-                      <span className="text-gray-400 font-semibold">Complet</span>
-                    )}
-
-                    {isBureau && (
-                      <button onClick={() => handleDeleteNeed(need.id)} className="text-red-500 hover:text-red-700 text-[10px]">Suppr</button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                    return (
+                      <td key={cIdx} className="p-2 text-center border-r last:border-r-0 min-w-[150px]">
+                        {matchingNeed ? (
+                          participation ? (
+                            // Case prise / grisée
+                            <div className={`text-xs py-2 px-2 rounded-md font-medium border flex flex-col items-center justify-center gap-1 ${isMyBooking ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-gray-100 border-gray-200 text-gray-500 opacity-80'}`}>
+                              <span className="truncate max-w-[130px]" title={participation.user_name}>
+                                🔒 {participation.user_name}
+                              </span>
+                              {isMyBooking && (
+                                <button
+                                  onClick={() => handleLeave(participation.id)}
+                                  className="text-[10px] bg-white text-red-600 hover:bg-red-50 border border-red-200 px-2 py-0.5 rounded shadow-xs cursor-pointer"
+                                >
+                                  Se libérer
+                                </button>
+                              )}
+                              {isBureau && !isMyBooking && (
+                                <button
+                                  onClick={() => handleDeleteNeed(matchingNeed.id)}
+                                  className="text-[10px] text-red-500 hover:underline cursor-pointer"
+                                >
+                                  Supprimer
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            // Case libre (cliquable)
+                            <div className="flex flex-col items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleBookCell(matchingNeed.id)}
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-2 px-3 rounded-md font-medium transition shadow-xs cursor-pointer"
+                              >
+                                ✓ Choisir
+                              </button>
+                              {isBureau && (
+                                <button
+                                  onClick={() => handleDeleteNeed(matchingNeed.id)}
+                                  className="text-[10px] text-red-500 hover:underline cursor-pointer"
+                                >
+                                  Suppr. case
+                                </button>
+                              )}
+                            </div>
+                          )
+                        ) : (
+                          <span className="text-gray-300 text-xs">-</span>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="bg-white border rounded-lg p-6 text-center text-gray-500 text-xs">
+          Aucun créneau ou poste défini pour le moment. Le bureau peut en ajouter un ci-dessus.
         </div>
       )}
 
-      {/* Liste globale de vos inscriptions pour pouvoir vous désinscrire facilement */}
+      {/* Liste globale de vos inscriptions pour un suivi rapide */}
       {myParticipations.length > 0 && (
         <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg space-y-2">
-          <p className="text-xs font-bold text-emerald-800">✓ Vos inscriptions enregistrées :</p>
+          <p className="text-xs font-bold text-emerald-800">✓ Vos créneaux réservés :</p>
           <div className="flex flex-wrap gap-2">
             {myParticipations.map(p => {
               const need = needs.find(n => n.id === p.need_id)
               return (
                 <span key={p.id} className="inline-flex items-center gap-1.5 bg-white border border-emerald-300 text-emerald-900 text-xs px-2.5 py-1 rounded-md shadow-xs">
-                  {need ? need.title : 'Participation'}
-                  <button onClick={() => handleLeave(p.id)} className="text-red-500 hover:text-red-700 font-bold ml-1">×</button>
+                  {need ? `${need.title} (${need.time_slot})` : 'Créneau'}
+                  <button onClick={() => handleLeave(p.id)} className="text-red-500 hover:text-red-700 font-bold ml-1 cursor-pointer">×</button>
                 </span>
               )
             })}
@@ -252,7 +235,6 @@ export default function EventsPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [events, setEvents] = useState<any[]>([])
-  const [bureauMembers, setBureauMembers] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
   const [loading, setLoading] = useState(false)
@@ -276,7 +258,6 @@ export default function EventsPage() {
       setProfile(profileData)
 
       fetchEvents()
-      fetchBureauMembers()
     }
     loadData()
   }, [])
@@ -284,11 +265,6 @@ export default function EventsPage() {
   const fetchEvents = async () => {
     const { data: eventsData } = await supabase.from('events').select('*').order('event_date', { ascending: true })
     setEvents(eventsData || [])
-  }
-
-  const fetchBureauMembers = async () => {
-    const { data } = await supabase.from('profiles').select('*')
-    if (data) setBureauMembers(data)
   }
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -408,7 +384,7 @@ export default function EventsPage() {
 
                 {isBureau && <div className="space-y-2"><EventFinanceManager eventId={event.id} /></div>}
 
-                {/* Gestionnaire dynamique des besoins et créneaux (ouvert à tous) */}
+                {/* Gestionnaire dynamique des besoins sous forme de matrice croisée */}
                 <EventNeedsManager eventId={event.id} isBureau={isBureau} user={user} profile={profile} />
               </div>
             ))
