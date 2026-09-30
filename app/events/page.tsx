@@ -252,9 +252,13 @@ export default function EventsPage() {
               );
 
               return (
-                <div key={event.id} className={`bg-white border rounded-xl p-6 shadow-sm space-y-4 ${
-                  event.visibility === 'secretariat' ? 'border-red-300 bg-red-50/30' : event.visibility === 'codir' ? 'border-purple-300 bg-purple-50/30' : ''
-                }`}>
+                <div 
+                  key={event.id} 
+                  id={`event-${event.id}`} 
+                  className={`bg-white border rounded-xl p-6 shadow-sm space-y-4 scroll-mt-20 ${
+                    event.visibility === 'secretariat' ? 'border-red-300 bg-red-50/30' : event.visibility === 'codir' ? 'border-purple-300 bg-purple-50/30' : ''
+                  }`}
+                >
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">

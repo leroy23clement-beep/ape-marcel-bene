@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { addChild } from "@/lib/actions/children";
 import Navbar from "@/components/Navbar";
+import Link from "next/link"; // <--- Import de Link
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -35,8 +36,7 @@ export default async function DashboardPage() {
     .order("event_date", { ascending: true })
     .limit(3);
 
-  // Récupération des statistiques financières de l'association (ex: table association_stats ou config globale)
-  // On suppose une table 'association_stats' avec une ligne unique ou filtrée par l'année en cours
+  // Récupération des statistiques financières de l'association
   const { data: stats } = await supabase
     .from("association_stats")
     .select("*")
@@ -170,7 +170,11 @@ export default async function DashboardPage() {
             <div className="space-y-3">
               {upcomingEvents && upcomingEvents.length > 0 ? (
                 upcomingEvents.map((event) => (
-                  <div key={event.id} className="p-3 bg-gray-50 border rounded-lg space-y-1">
+                  <Link
+                    key={event.id}
+                    href={`/events#event-${event.id}`}
+                    className="block p-3 bg-gray-50 border rounded-lg space-y-1 hover:bg-gray-100 transition cursor-pointer"
+                  >
                     <div className="flex justify-between items-start">
                       <h3 className="font-bold text-sm text-gray-900">{event.title}</h3>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -185,7 +189,7 @@ export default async function DashboardPage() {
                     {event.location && (
                       <p className="text-xs text-gray-500">📍 {event.location}</p>
                     )}
-                  </div>
+                  </Link>
                 ))
               ) : (
                 <p className="text-sm text-gray-500 italic">
