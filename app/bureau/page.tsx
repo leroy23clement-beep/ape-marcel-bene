@@ -8,6 +8,7 @@ export default function BureauPage() {
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadData() {
@@ -23,14 +24,20 @@ export default function BureauPage() {
         .select('*')
         .eq('id', user.id)
         .single()
+        
       setProfile(profileData)
+      setLoading(false)
     }
     loadData()
   }, [])
 
+  if (loading) return null
   if (!user) return null
 
-  const isBureau = profile?.role && profile.role !== 'parent'
+  // Liste des rôles ayant accès à l'Espace Bureau
+  const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
+  const userRole = profile?.role ? profile.role.toLowerCase() : 'parent'
+  const isBureau = allowedBureauRoles.includes(userRole)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -48,13 +55,13 @@ export default function BureauPage() {
           <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-gray-800">Gestion interne</h2>
             <p className="text-sm text-gray-600">
-              Bienvenue dans l'espace de gestion restreint. Tu peux ici retrouver les outils administratifs de l'APE Marcel Béné.
+              Bienvenue dans l'espace de gestion restreint. Tu peux ici retrouver les outils administratifs de l'APE Marcel Béné (Rôle actuel : <strong className="uppercase">{profile?.role}</strong>).
             </p>
             {/* Tu pourras ajouter ici des liens ou des tableaux de gestion */}
           </div>
         ) : (
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700 text-sm">
-            Accès restreint. Cet espace est réservé aux membres du bureau.
+            Accès restreint. Cet espace est réservé aux membres du bureau et de l'administration.
           </div>
         )}
       </main>

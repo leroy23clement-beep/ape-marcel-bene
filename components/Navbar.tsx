@@ -15,7 +15,9 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     window.location.href = '/login'
   }
 
-  const isBureau = role && role !== 'parent'
+  // Tous les rôles qui ont accès à l'Espace Bureau
+  const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
+  const isBureau = role ? allowedBureauRoles.includes(role.toLowerCase()) : false
 
   const navLinks = [
     { name: 'Tableau de bord', href: '/dashboard' },
@@ -30,12 +32,12 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
          {/* Logo / Nom */}
-<div className="flex items-center">
-  <Link href="/dashboard" className="flex items-center gap-2 font-bold text-gray-900 text-lg">
-    <img src="/logo.jpg" alt="Logo APE" className="w-8 h-8 object-contain" />
-    <span>APE Marcel Béné</span>
-  </Link>
-</div>
+          <div className="flex items-center">
+            <Link href="/dashboard" className="flex items-center gap-2 font-bold text-gray-900 text-lg">
+              <img src="/logo.jpg" alt="Logo APE" className="w-8 h-8 object-contain" />
+              <span>APE Marcel Béné</span>
+            </Link>
+          </div>
 
           {/* Navigation Desktop */}
           <div className="hidden md:flex items-center space-x-6">
