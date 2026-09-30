@@ -81,9 +81,9 @@ export default function ManageCalendarPage() {
     try {
       const { error: insertError } = await supabase.from('bureau_calendar').insert({
         title,
-        event_date: eventDate, // Correspond à ta colonne Supabase
+        event_date: eventDate,
         location: location || null,
-        description: description || null,
+        description: description || '', // Si vide, envoie une chaîne vide pour éviter l'erreur NOT NULL
       });
 
       if (insertError) {
