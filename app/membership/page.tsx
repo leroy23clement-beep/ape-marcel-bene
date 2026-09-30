@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import { submitMembership, updateMembershipStatus } from "@/lib/actions/membership";
+import { updateMembershipStatus } from "@/lib/actions/membership";
 
 export default async function MembershipPage() {
   const supabase = await createClient();
@@ -18,15 +18,7 @@ export default async function MembershipPage() {
   const isTresorerie = ["tresorier", "vice_tresorier", "president", "admin"].includes(profile?.role ?? "");
   const currentSchoolYear = "2026-2027";
 
-  // Adhésion de l'utilisateur courant
-  const { data: myMembership } = await supabase
-    .from("memberships")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("school_year", currentSchoolYear)
-    .maybeSingle();
-
-  // Toutes les adhésions (visible pour la trésorerie)
+  // Toutes les adhésions / dons (visible pour la trésorerie)
   const { data: allMemberships } = isTresorerie
     ? await supabase
         .from("memberships")
@@ -41,74 +33,46 @@ export default async function MembershipPage() {
 
       <main className="mx-auto max-w-4xl p-6 space-y-8">
         <header className="border-b pb-4">
-          <h1 className="text-2xl font-bold text-gray-900">Adhésion & Cotisation APE</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Soutenir l'Association (Dons)</h1>
           <p className="text-sm text-gray-600 mt-1">
-            L'adhésion est facultative. Elle permet de soutenir financièrement les activités et sorties organisées pour les enfants.
+            Participez aux projets de l'école et aidez-nous à financer les activités et sorties des enfants.
           </p>
         </header>
 
-        {/* Statut ou Formulaire d'adhésion */}
-        <section className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
-          <h2 className="text-lg font-bold text-gray-800">
-            Votre adhésion pour l'année {currentSchoolYear}
-          </h2>
+        {/* Section Redirection HelloAsso */}
+        <section className="bg-white border rounded-xl p-8 shadow-sm space-y-6 text-center">
+          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+            ❤️
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-gray-900">Faire un don en ligne via HelloAsso</h2>
+            <p className="text-sm text-gray-600 max-w-md mx-auto">
+              Les dons recueillis servent directement à organiser les événements (comme la fête de l'école) et à acheter du matériel pédagogique pour les élèves.
+            </p>
+          </div>
 
-          {myMembership ? (
-            <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 flex justify-between items-center">
-              <div>
-                <p className="font-semibold text-emerald-900 text-sm">
-                  {myMembership.status === "validated" ? "✓ Adhésion validée" : "⏳ Adhésion en attente de règlement"}
-                </p>
-                <p className="text-xs text-emerald-700 mt-0.5">
-                  Montant : {myMembership.amount.toFixed(2)} € ({myMembership.payment_method})
-                </p>
-              </div>
-              <span className="text-xs font-medium bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-300">
-                {myMembership.status === "validated" ? "Adhérent" : "En cours"}
-              </span>
-            </div>
-          ) : (
-            <form action={submitMembership} className="space-y-4 max-w-lg">
-              <input type="hidden" name="schoolYear" value={currentSchoolYear} />
+          <div className="pt-2">
+            <a
+              href="https://www.helloasso.com/associations/association-de-parents-d-eleves-de-l-ecole-marcel-bene-muizon" // Remplace par ton lien HelloAsso exact
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-6 py-3 rounded-xl transition shadow-sm cursor-pointer"
+            >
+              Accéder à notre page de don HelloAsso ↗
+            </a>
+          </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700">Montant de la cotisation libre (€)</label>
-                <input
-                  type="number"
-                  name="amount"
-                  defaultValue="5.00"
-                  min="1"
-                  step="0.5"
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700">Moyen de règlement</label>
-                <select name="paymentMethod" className="w-full text-sm p-2.5 rounded-lg border bg-white">
-                  <option value="helloasso">Paiement en ligne (HelloAsso)</option>
-                  <option value="chèque">Chèque (à l'ordre de l'APE)</option>
-                  <option value="espèces">Espèces</option>
-                  <option value="virement">Virement bancaire</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition"
-              >
-                Adhérer à l'association
-              </button>
-            </form>
-          )}
+          <p className="text-xs text-gray-400">
+            Paiement 100% sécurisé via la plateforme HelloAsso.
+          </p>
         </section>
 
-        {/* Espace Trésorerie : Gestion des adhésions */}
+        {/* Espace Trésorerie : Gestion des versements / dons */}
         {isTresorerie && (
           <section className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-bold text-gray-800">
-              Gestion de la trésorerie — Adhésions {currentSchoolYear}
+              Gestion de la trésorerie — Dons {currentSchoolYear}
             </h2>
 
             <div className="divide-y text-sm">
@@ -129,7 +93,7 @@ export default async function MembershipPage() {
                       <select
                         name="status"
                         defaultValue={m.status}
-                        className="text-xs p-1.5 rounded-lg border bg-white"
+                        className="text-xs p-1.5 rounded-lg border bg-white text-gray-900"
                       >
                         <option value="pending">En attente</option>
                         <option value="validated">Validé</option>
@@ -137,7 +101,7 @@ export default async function MembershipPage() {
                       </select>
                       <button
                         type="submit"
-                        className="bg-purple-700 hover:bg-purple-800 text-white text-xs px-3 py-1.5 rounded-lg transition"
+                        className="bg-purple-700 hover:bg-purple-800 text-white text-xs px-3 py-1.5 rounded-lg transition cursor-pointer"
                       >
                         Mettre à jour
                       </button>
@@ -145,7 +109,7 @@ export default async function MembershipPage() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-500 italic py-2">Aucune adhésion enregistrée pour cette année.</p>
+                <p className="text-sm text-gray-500 italic py-2">Aucun don enregistré pour le moment.</p>
               )}
             </div>
           </section>
