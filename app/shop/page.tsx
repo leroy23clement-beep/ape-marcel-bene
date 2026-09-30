@@ -12,7 +12,8 @@ export default function ShopPage() {
   const [userOrders, setUserOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
-  // Champs du formulaire d'ajout
+  // Champs du formulaire d'ajout / modification
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
   const [externalLink, setExternalLink] = useState('')
@@ -58,7 +59,7 @@ export default function ShopPage() {
     setUserOrders(ordData || [])
   }
 
-  const handleCreateProduct = async (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name) {
       alert("Veuillez renseigner un nom de produit.")
@@ -67,32 +68,75 @@ export default function ShopPage() {
 
     setLoading(true)
     try {
-      const { error } = await supabase.from('products').insert({
+      const productData = {
         name,
         price: price ? parseFloat(price) : 0,
         external_link: externalLink || null,
         start_date: startDate || null,
         end_date: endDate || null,
         description: description || null,
-      })
+      }
 
-      if (error) throw error
+      if (editingId) {
+        // Mode Modification
+        const { error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', editingId)
 
-      alert("Vente / Produit publié avec succès !")
-      setName('')
-      setPrice('')
-      setExternalLink('')
-      setStartDate('')
-      setEndDate('')
-      setDescription('')
+        if (error) throw error
+        alert("Vente mise à jour avec succès !")
+      } else {
+        // Mode Création
+        const { error } = await supabase
+          .from('products')
+          .insert(productData)
 
+        if (error) throw error
+        alert("Vente / Produit publié avec succès !")
+      }
+
+      resetForm()
       if (user) fetchShopData(user.id)
     } catch (error: any) {
       console.error("Erreur:", error)
-      alert("Erreur lors de la publication : " + error.message)
+      alert("Erreur lors de l'enregistrement : " + error.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleStartEdit = (product: any) => {
+    setEditingId(product.id)
+    setName(product.name || '')
+    setPrice(product.price ? product.price.toString() : '')
+    setExternalLink(product.external_link || '')
+    setStartDate(product.start_date ? product.start_date.split('T')[0] : '')
+    setEndDate(product.end_date ? product.end_date.split('T')[0] : '')
+    setDescription(product.description || '')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cette vente/produit ?")) return
+
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', id)
+      if (error) throw error
+      if (user) fetchShopData(user.id)
+    } catch (error: any) {
+      alert("Erreur lors de la suppression : " + error.message)
+    }
+  }
+
+  const resetForm = () => {
+    setEditingId(null)
+    setName('')
+    setPrice('')
+    setExternalLink('')
+    setStartDate('')
+    setEndDate('')
+    setDescription('')
   }
 
   const handleOrder = async (productId: string, quantity: number) => {
@@ -134,14 +178,25 @@ export default function ShopPage() {
           </p>
         </header>
 
-        {/* Formulaire d'ajout réservé au Bureau */}
+        {/* Formulaire d'ajout / modification réservé au Bureau */}
         {isBureau && (
           <section className="bg-purple-50/50 border border-purple-200 rounded-xl p-5 space-y-4">
-            <h2 className="text-lg font-bold text-purple-900 flex items-center gap-2">
-              <span>🛍️</span> Ajouter un produit / Une vente
-            </h2>
+            <div className="flex justify-between items-center border-b border-purple-200 pb-2">
+              <h2 className="text-lg font-bold text-purple-900 flex items-center gap-2">
+                <span>🛍️</span> {editingId ? "Modifier le produit / la vente" : "Ajouter un produit / Une vente"}
+              </h2>
+              {editingId && (
+                <button 
+                  type="button" 
+                  onClick={resetForm} 
+                  className="text-xs text-gray-600 hover:text-gray-900 underline font-medium cursor-pointer"
+                >
+                  Annuler la modification
+                </button>
+              )}
+            </div>
 
-            <form onSubmit={handleCreateProduct} className="grid gap-4 md:grid-cols-2">
+            <form onSubmit={handleSaveProduct} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Nom du produit / de la vente</label>
                 <input
@@ -214,7 +269,7 @@ export default function ShopPage() {
                   disabled={loading}
                   className="bg-purple-700 hover:bg-purple-800 disabled:bg-gray-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition cursor-pointer"
                 >
-                  {loading ? "Publication..." : "Publier la vente"}
+                  {loading ? "Enregistrement..." : editingId ? "Mettre à jour" : "Publier la vente"}
                 </button>
               </div>
             </form>
@@ -250,7 +305,7 @@ export default function ShopPage() {
                     )}
                   </div>
 
-                  <div className="pt-3 border-t">
+                  <div className="space-y-3 pt-3 border-t">
                     {product.external_link ? (
                       <a
                         href={product.external_link}
@@ -285,6 +340,26 @@ export default function ShopPage() {
                           Commander en ligne
                         </button>
                       </form>
+                    )}
+
+                    {/* Boutons d'administration (Modifier / Supprimer) pour le Bureau */}
+                    {isBureau && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(product)}
+                          className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1 rounded font-medium cursor-pointer"
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="text-xs bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1 rounded font-medium cursor-pointer"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
