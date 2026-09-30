@@ -10,24 +10,7 @@ export async function addTeamMember(formData: FormData) {
     // Vérification de l'utilisateur connecté
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      throw new Error("Utilisateur non authentifié.");
-    }
-
-    // Récupération optionnelle du profil (évite un blocage 500 si le profil n'a pas de colonne role)
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    const userRole = profile?.role ? profile.role.toLowerCase() : 'bureau';
-    const allowedRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau'];
-    
-    // Si tu veux être sûr de ne pas être bloqué par le rôle pendant tes tests, 
-    // tu peux t'assurer que ton profil a bien un rôle valide dans Supabase.
-    if (!allowedRoles.includes(userRole) && userRole !== '') {
-      // Optionnel : tu peux commenter cette ligne temporairement si ton rôle pose souci
-      // throw new Error(`Accès refusé pour le rôle : ${userRole}`);
+      return { success: false, error: "Utilisateur non authentifié." };
     }
 
     const firstName = formData.get("firstName") as string;
@@ -36,7 +19,7 @@ export async function addTeamMember(formData: FormData) {
     const photoFile = formData.get("photoFile") as File;
 
     if (!firstName || !lastName || !roleTitle) {
-      throw new Error("Veuillez remplir les champs obligatoires (Prénom, Nom, Rôle).");
+      return { success: false, error: "Veuillez remplir les champs obligatoires (Prénom, Nom, Rôle)." };
     }
 
     let photoUrl = null;
@@ -51,7 +34,7 @@ export async function addTeamMember(formData: FormData) {
         .upload(fileName, photoFile);
 
       if (uploadError) {
-        throw new Error("Erreur Storage : " + uploadError.message);
+        return { success: false, error: "Erreur Storage : " + uploadError.message };
       }
 
       const { data: publicUrlData } = supabase.storage
@@ -70,13 +53,15 @@ export async function addTeamMember(formData: FormData) {
     });
 
     if (insertError) {
-      throw new Error("Erreur Insertion Base de données : " + insertError.message);
+      return { success: false, error: "Erreur Insertion Base de données : " + insertError.message };
     }
 
     revalidatePath("/about");
     revalidatePath("/bureau/team");
+
+    return { success: true };
   } catch (err: any) {
     console.error("ERREUR LORS DE L'AJOUT DU MEMBRE:", err.message);
-    throw new Error(err.message || "Une erreur interne est survenue.");
+    return { success: false, error: err.message || "Une erreur interne est survenue." };
   }
 }
