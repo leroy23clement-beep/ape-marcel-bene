@@ -42,11 +42,18 @@ export default async function DashboardPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  // Récupération des statistiques financières de l'association
+  // Récupération des statistiques financières de l'association depuis Supabase
   const { data: stats } = await supabase
     .from("association_stats")
     .select("*")
     .single();
+
+  // Calcul du bénéfice historique (Fête des enfants : 5206.50 € de recettes - 2104.94 € de dépenses)
+  const feteEnfantsProfit = 5206.50 - 2104.94; // 3101.56 €
+  
+  // Total global des bénéfices (on additionne la base de données s'il y a d'autres événements + l'événement historique)
+  const dbProfits = stats?.total_profits ?? 0;
+  const totalProfits = dbProfits + feteEnfantsProfit;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -61,19 +68,24 @@ export default async function DashboardPage() {
         
         {/* 1. Indicateurs Financiers */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between">
+          
+          {/* Bloc Bénéfices Cliquable */}
+          <Link 
+            href="/dashboard/profits"
+            className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between hover:border-purple-500 transition cursor-pointer group"
+          >
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Bénéfices Manifestations (Année)
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider group-hover:text-purple-700 transition">
+                Bénéfices Manifestations (Année) ↗
               </p>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">
-                {stats?.total_profits ? `${stats.total_profits} €` : "0 €"}
+              <p className="text-2xl font-bold text-purple-700 mt-1">
+                {totalProfits.toFixed(2)} €
               </p>
             </div>
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-full text-lg">
+            <div className="p-3 bg-purple-50 text-purple-700 rounded-full text-lg">
               💶
             </div>
-          </div>
+          </Link>
 
           <div className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between">
             <div>
@@ -98,7 +110,7 @@ export default async function DashboardPage() {
             </h2>
             <Link 
               href="/shop" 
-              className="text-xs font-medium text-emerald-600 hover:underline"
+              className="text-xs font-medium text-purple-700 hover:underline"
             >
               Voir la boutique ↗
             </Link>
@@ -110,7 +122,7 @@ export default async function DashboardPage() {
                 <Link
                   key={product.id}
                   href="/shop"
-                  className="block p-4 bg-gray-50 border rounded-lg space-y-2 hover:border-emerald-500 transition cursor-pointer"
+                  className="block p-4 bg-gray-50 border rounded-lg space-y-2 hover:border-purple-500 transition cursor-pointer"
                 >
                   <div className="flex justify-between items-start">
                     <div>
@@ -119,7 +131,7 @@ export default async function DashboardPage() {
                         <p className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description}</p>
                       )}
                     </div>
-                    <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 whitespace-nowrap">
+                    <span className="text-sm font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200 whitespace-nowrap">
                       {product.price ? (typeof product.price === 'number' ? `${product.price.toFixed(2)} €` : product.price) : ""}
                     </span>
                   </div>
@@ -149,7 +161,7 @@ export default async function DashboardPage() {
                 >
                   <div className="flex justify-between items-start">
                     <h3 className="font-bold text-sm text-gray-900">{event.title}</h3>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
                       {new Date(event.event_date).toLocaleDateString("fr-FR", {
                         day: "numeric",
                         month: "short",

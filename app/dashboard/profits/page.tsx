@@ -15,13 +15,13 @@ export default async function ProfitsDetailsPage() {
     .eq("id", user.id)
     .single();
 
-  // Récupération des événements depuis la base de données
+  // Récupération des événements futurs depuis Supabase
   const { data: dbEvents } = await supabase
     .from("events")
     .select("id, title, event_date, revenue, expenses")
     .order("event_date", { ascending: false });
 
-  // Événement historique / antérieur (Fête des enfants)
+  // Événement historique (Fête des enfants du 26 septembre 2026)
   const manualEvent = {
     id: "fete-enfants-2026",
     title: "Fête des enfants",
@@ -33,7 +33,7 @@ export default async function ProfitsDetailsPage() {
   // On combine l'événement manuel et ceux de la base de données
   const events = [manualEvent, ...(dbEvents || [])];
 
-  // Calcul du total global des bénéfices
+  // Calcul du total cumulé des bénéfices
   const totalProfits = events.reduce((acc, ev) => {
     return acc + ((ev.revenue || 0) - (ev.expenses || 0));
   }, 0);
