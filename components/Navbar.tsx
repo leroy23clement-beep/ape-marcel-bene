@@ -21,7 +21,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     { name: 'Tableau de bord', href: '/dashboard' },
     { name: 'Événements', href: '/events' },
     { name: 'Boutique', href: '/shop' },
-    { name: 'Adhésion', href: '/membership' },
+    { name: 'Don', href: '/membership' },
     ...(isBureau ? [{ name: 'Espace Bureau', href: '/bureau' }] : []),
   ]
 

@@ -54,7 +54,7 @@ export default async function MembershipPage() {
 
           <div className="pt-2">
             <a
-              href="https://www.helloasso.com/associations/association-de-parents-d-eleves-de-l-ecole-marcel-bene-muizon" // Remplace par ton lien HelloAsso exact
+              href="https://www.helloasso.com/associations/association-de-parents-d-eleves-de-l-ecole-marcel-bene-muizon/formulaires/1" // Remplace par ton lien HelloAsso exact
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-6 py-3 rounded-xl transition shadow-sm cursor-pointer"
