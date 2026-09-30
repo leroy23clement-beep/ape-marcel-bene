@@ -39,7 +39,7 @@ export default async function AboutPage() {
             L'APE Marcel Béné, <span className="text-purple-700">c'est nous !</span>
           </h1>
           <p className="text-base text-gray-600 max-w-2xl mx-auto">
-            11 membres actifs de l'Association des Parents d'Élèves des écoles Marcel Béné[cite: 9]. Une association loi 1901 où tout le monde peut être membre gratuitement[cite: 9].
+            11 membres actifs de l'Association des Parents d'Élèves des écoles Marcel Béné. Une association loi 1901 où tout le monde peut être membre gratuitement.
           </p>
         </header>
 
@@ -58,7 +58,7 @@ export default async function AboutPage() {
           <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-2 border-l-4 border-l-indigo-500">
             <h2 className="text-lg font-bold text-indigo-600 uppercase tracking-wide">🎯 Pour quoi faire ?</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
-              Pour participer aux financements de projets pédagogiques (sorties scolaires, intervenants extérieurs, spectacles, matériel pour les classes...)[cite: 9].
+              Pour participer aux financements de projets pédagogiques (sorties scolaires, intervenants extérieurs, spectacles, matériel pour les classes...).
             </p>
           </div>
 
@@ -66,7 +66,7 @@ export default async function AboutPage() {
           <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-2 border-l-4 border-l-emerald-500">
             <h2 className="text-lg font-bold text-emerald-600 uppercase tracking-wide">🎉 Comment ?</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
-              Au travers de manifestations (vente de gâteaux[cite: 9], boums, kermesse, Babybrac[cite: 9]...). Chaque animation est conçue pour récolter des fonds intégralement reversés aux écoles[cite: 9].
+              Au travers de manifestations (vente de gâteaux, boums, kermesse, Babybrac...). Chaque animation est conçue pour récolter des fonds intégralement reversés aux écoles.
             </p>
           </div>
 
@@ -74,7 +74,7 @@ export default async function AboutPage() {
           <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-2 border-l-4 border-l-amber-500">
             <h2 className="text-lg font-bold text-amber-600 uppercase tracking-wide">🤝 Avec qui ?</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
-              En partenariat avec les équipes enseignantes, les représentants de parents d'élèves, la Mairie et les autres associations du village[cite: 9].
+              En partenariat avec les équipes enseignantes, les représentants de parents d'élèves, la Mairie et les autres associations du village.
             </p>
           </div>
 
@@ -82,9 +82,9 @@ export default async function AboutPage() {
 
         {/* SECTION : MAIS C'EST AUSSI VOUS */}
         <div className="bg-purple-900 text-white rounded-2xl p-8 text-center space-y-4 shadow-md">
-          <h2 className="text-2xl font-bold">Mais c'est aussi VOUS ![cite: 9]</h2>
+          <h2 className="text-2xl font-bold">Mais c'est aussi VOUS !</h2>
           <p className="text-sm text-purple-100 max-w-2xl mx-auto leading-relaxed">
-            Tous les parents d'élèves qui souhaitent aider à l'organisation, la préparation de gâteaux ou l'installation lors des manifestations font partie intégrante de l'aventure[cite: 9]. Rejoignez-nous !
+            Tous les parents d'élèves qui souhaitent aider à l'organisation, la préparation de gâteaux ou l'installation lors des manifestations font partie intégrante de l'aventure. Rejoignez-nous !
           </p>
         </div>
 
