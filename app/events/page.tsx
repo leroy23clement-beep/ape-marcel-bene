@@ -296,13 +296,13 @@ export default function EventsPage() {
                     </div>
                   </div>
 
-                  {/* Affichage direct de l'image avec une balise img classique */}
+                  {/* Affichage direct de l'image en entier sans rognage */}
                   {event.image_url && (
-                    <div className="w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100">
+                    <div className="w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center">
                       <img
                         src={event.image_url}
                         alt={event.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     </div>
                   )}

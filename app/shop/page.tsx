@@ -1,34 +1,126 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import Navbar from "@/components/Navbar";
-import { createProduct, createOrder } from "@/lib/actions/shop";
+'use client'
 
-export default async function ShopPage() {
-  const supabase = await createClient();
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import Navbar from '@/components/Navbar'
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+export default function ShopPage() {
+  const supabase = createClient()
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [products, setProducts] = useState<any[]>([])
+  const [userOrders, setUserOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  // Champs du formulaire d'ajout
+  const [name, setName] = useState('')
+  const [price, setPrice] = useState('')
+  const [externalLink, setExternalLink] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [description, setDescription] = useState('')
 
-  const isBureau = profile?.role && profile.role !== "parent";
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        window.location.href = '/login'
+        return
+      }
+      setUser(user)
 
-  // Produits en vente
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: false });
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      setProfile(profileData)
 
-  // Commandes de l'utilisateur
-  const { data: userOrders } = await supabase
-    .from("orders")
-    .select("*, products(*)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+      fetchShopData(user.id)
+    }
+    loadData()
+  }, [])
+
+  const fetchShopData = async (userId: string) => {
+    // Récupérer les produits
+    const { data: prodData } = await supabase
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setProducts(prodData || [])
+
+    // Récupérer les commandes
+    const { data: ordData } = await supabase
+      .from('orders')
+      .select('*, products(*)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    setUserOrders(ordData || [])
+  }
+
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name) {
+      alert("Veuillez renseigner un nom de produit.")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase.from('products').insert({
+        name,
+        price: price ? parseFloat(price) : 0,
+        external_link: externalLink || null,
+        start_date: startDate || null,
+        end_date: endDate || null,
+        description: description || null,
+      })
+
+      if (error) throw error
+
+      alert("Vente / Produit publié avec succès !")
+      setName('')
+      setPrice('')
+      setExternalLink('')
+      setStartDate('')
+      setEndDate('')
+      setDescription('')
+
+      if (user) fetchShopData(user.id)
+    } catch (error: any) {
+      console.error("Erreur:", error)
+      alert("Erreur lors de la publication : " + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOrder = async (productId: string, quantity: number) => {
+    try {
+      const product = products.find(p => p.id === productId)
+      const totalPrice = (product?.price || 0) * quantity
+
+      const { error } = await supabase.from('orders').insert({
+        user_id: user.id,
+        product_id: productId,
+        quantity,
+        total_price: totalPrice,
+        status: 'pending'
+      })
+
+      if (error) throw error
+
+      alert("Commande enregistrée avec succès !")
+      fetchShopData(user.id)
+    } catch (error: any) {
+      console.error("Erreur commande:", error)
+      alert("Erreur lors de la commande : " + error.message)
+    }
+  }
+
+  const isBureau = profile?.role && profile.role !== "parent"
+
+  if (!user) return null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -49,15 +141,16 @@ export default async function ShopPage() {
               <span>🛍️</span> Ajouter un produit / Une vente
             </h2>
 
-            <form action={createProduct} className="grid gap-4 md:grid-cols-2">
+            <form onSubmit={handleCreateProduct} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Nom du produit / de la vente</label>
                 <input
                   type="text"
-                  name="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required
                   placeholder="ex: Vente de Jus de Pomme, Tickets Tombola..."
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
                 />
               </div>
 
@@ -66,9 +159,10 @@ export default async function ShopPage() {
                 <input
                   type="number"
                   step="0.01"
-                  name="price"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
                   placeholder="0.00"
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
                 />
               </div>
 
@@ -76,9 +170,10 @@ export default async function ShopPage() {
                 <label className="text-xs font-medium text-gray-700">Lien du site de vente externe (optionnel)</label>
                 <input
                   type="url"
-                  name="external_link"
+                  value={externalLink}
+                  onChange={(e) => setExternalLink(e.target.value)}
                   placeholder="ex: https://www.helloasso.com/associations/ape/evenements/..."
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
                 />
               </div>
 
@@ -86,8 +181,9 @@ export default async function ShopPage() {
                 <label className="text-xs font-medium text-gray-700">Date de début de vente</label>
                 <input
                   type="date"
-                  name="start_date"
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
                 />
               </div>
 
@@ -95,27 +191,30 @@ export default async function ShopPage() {
                 <label className="text-xs font-medium text-gray-700">Date de fin de vente</label>
                 <input
                   type="date"
-                  name="end_date"
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
                 />
               </div>
 
               <div className="md:col-span-2 space-y-1">
                 <label className="text-xs font-medium text-gray-700">Description</label>
                 <textarea
-                  name="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   rows={2}
                   placeholder="Informations sur la livraison, consignes, dates de retrait..."
-                  className="w-full text-sm p-2.5 rounded-lg border bg-white"
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
                 />
               </div>
 
               <div className="md:col-span-2 flex justify-end pt-2 border-t border-purple-200">
                 <button
                   type="submit"
-                  className="bg-purple-700 hover:bg-purple-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+                  disabled={loading}
+                  className="bg-purple-700 hover:bg-purple-800 disabled:bg-gray-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition cursor-pointer"
                 >
-                  Publier la vente
+                  {loading ? "Publication..." : "Publier la vente"}
                 </button>
               </div>
             </form>
@@ -162,19 +261,26 @@ export default async function ShopPage() {
                         🔗 Accéder au site de commande ↗
                       </a>
                     ) : (
-                      <form action={createOrder} className="flex items-center gap-2">
-                        <input type="hidden" name="productId" value={product.id} />
+                      <form 
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          const form = e.currentTarget
+                          const qtyInput = form.elements.namedItem('quantity') as HTMLInputElement
+                          handleOrder(product.id, parseInt(qtyInput.value) || 1)
+                        }} 
+                        className="flex items-center gap-2"
+                      >
                         <input
                           type="number"
                           name="quantity"
                           min="1"
                           defaultValue="1"
-                          className="w-16 text-xs p-2 border rounded-lg focus:outline-emerald-600 text-center bg-white"
+                          className="w-16 text-xs p-2 border rounded-lg focus:outline-emerald-600 text-center bg-white text-gray-900"
                           required
                         />
                         <button
                           type="submit"
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-lg transition"
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-lg transition cursor-pointer"
                         >
                           Commander en ligne
                         </button>
@@ -215,5 +321,5 @@ export default async function ShopPage() {
         )}
       </main>
     </div>
-  );
+  )
 }
