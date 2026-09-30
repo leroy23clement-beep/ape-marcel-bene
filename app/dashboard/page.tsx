@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { addChild } from "@/lib/actions/children";
 import Navbar from "@/components/Navbar";
-import Link from "next/link"; // <--- Import de Link
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -35,6 +35,12 @@ export default async function DashboardPage() {
     .gte("event_date", new Date().toISOString())
     .order("event_date", { ascending: true })
     .limit(3);
+
+  // Récupération des ventes en cours (table products)
+  const { data: products } = await supabase
+    .from("products")
+    .select("*")
+    .order("created_at", { ascending: false });
 
   // Récupération des statistiques financières de l'association
   const { data: stats } = await supabase
@@ -81,6 +87,49 @@ export default async function DashboardPage() {
             <div className="p-3 bg-blue-50 text-blue-600 rounded-full text-lg">
               🏫
             </div>
+          </div>
+        </div>
+
+        {/* Section Ventes et Boutique en cours */}
+        <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
+          <div className="flex justify-between items-center border-b pb-2">
+            <h2 className="font-semibold text-gray-800 text-lg">
+              Boutique & Ventes en cours
+            </h2>
+            <Link 
+              href="/shop" 
+              className="text-xs font-medium text-emerald-600 hover:underline"
+            >
+              Voir la boutique ↗
+            </Link>
+          </div>
+
+          <div className="space-y-3">
+            {products && products.length > 0 ? (
+              products.map((product) => (
+                <Link
+                  key={product.id}
+                  href="/shop"
+                  className="block p-4 bg-gray-50 border rounded-lg space-y-2 hover:border-emerald-500 transition cursor-pointer"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold text-sm text-gray-900">{product.name}</h3>
+                      {product.description && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                      {product.price ? `${product.price.toFixed(2)} €` : ""}
+                    </span>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500 italic">
+                Aucune vente en cours pour le moment.
+              </p>
+            )}
           </div>
         </div>
 
