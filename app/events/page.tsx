@@ -4,9 +4,8 @@ import EventFinanceManager from '@/components/EventFinanceManager'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import { registerVolunteer } from '@/lib/actions/events'
 
-// Composant interne pour gérer les tâches d'un événement
+// Composant interne pour gérer les tâches d'un événement (Réservé au bureau)
 function EventTasksManager({ eventId, members }: { eventId: string; members: any[] }) {
   const [tasks, setTasks] = useState<any[]>([])
   const [title, setTitle] = useState('')
@@ -80,7 +79,6 @@ function EventTasksManager({ eventId, members }: { eventId: string; members: any
         <span>📋</span> Tâches à faire pour cet événement ({tasks.length})
       </h4>
 
-      {/* Formulaire d'ajout de tâche */}
       <form onSubmit={handleAddTask} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5 items-end bg-white p-3 rounded-lg border shadow-xs">
         <div className="md:col-span-2">
           <label className="block text-[11px] font-medium text-gray-700 mb-1">Nouvelle tâche *</label>
@@ -142,7 +140,6 @@ function EventTasksManager({ eventId, members }: { eventId: string; members: any
         </button>
       </form>
 
-      {/* Liste des tâches */}
       <div className="space-y-2">
         {tasks.length > 0 ? (
           tasks.map((task) => (
@@ -184,6 +181,147 @@ function EventTasksManager({ eventId, members }: { eventId: string; members: any
   )
 }
 
+// Composant de participation interactif (Ouvert à tous : Bureau et Parents)
+function EventParticipationManager({ eventId, isBureau, user, profile }: { eventId: string; isBureau: boolean; user: any; profile: any }) {
+  const [participants, setParticipants] = useState<any[]>([])
+  const [taskName, setTaskName] = useState('Participation générale / Bénévolat')
+  const [customTask, setCustomTask] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchParticipants()
+  }, [eventId])
+
+  async function fetchParticipants() {
+    const { data } = await supabase
+      .from('event_participants')
+      .select('*')
+      .eq('event_id', eventId)
+    if (data) setParticipants(data)
+  }
+
+  async function handleParticipate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user) return
+
+    const selectedRole = customTask.trim() || taskName
+    const userName = profile ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user.email
+
+    setLoading(true)
+    const { error } = await supabase.from('event_participants').insert({
+      event_id: eventId,
+      user_id: user.id,
+      user_name: userName,
+      task_name: selectedRole,
+    })
+
+    if (!error) {
+      setCustomTask('')
+      fetchParticipants()
+    } else {
+      alert("Erreur lors de l'inscription : " + error.message)
+    }
+    setLoading(false)
+  }
+
+  async function handleLeave(participantId: string) {
+    const { error } = await supabase
+      .from('event_participants')
+      .delete()
+      .eq('id', participantId)
+
+    if (!error) fetchParticipants()
+  }
+
+  const userName = profile ? `${profile.first_name} ${profile.last_name || ''}`.trim() : user?.email
+  const userParticipations = participants.filter(p => p.user_id === user?.id)
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200 space-y-4 bg-purple-50/30 p-4 rounded-xl">
+      <div className="flex justify-between items-center">
+        <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+          <span>🙋‍♂️</span> Inscriptions & Créneaux ({participants.length} bénévole{participants.length > 1 ? 's' : ''})
+        </h4>
+      </div>
+
+      {/* Formulaire d'inscription */}
+      <form onSubmit={handleParticipate} className="bg-white p-4 rounded-lg border shadow-xs space-y-3">
+        <p className="text-xs font-bold text-gray-800">Je m'inscris à une tâche / un créneau :</p>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-medium text-gray-700 mb-1">Poste ou besoin</label>
+            <select
+              value={taskName}
+              onChange={(e) => setTaskName(e.target.value)}
+              className="w-full p-2 border rounded text-xs text-gray-900 bg-white"
+            >
+              <option value="Participation générale / Bénévolat">Participation générale / Bénévolat</option>
+              <option value="Préparation de gâteau / crêpes">🍰 Préparation de gâteau / crêpes</option>
+              <option value="Installation (avant l'événement)">🛠️ Installation (avant l'événement)</option>
+              <option value="Rangement (après l'événement)">🧹 Rangement (après l'événement)</option>
+              <option value="Tenue de stand (Créneau 1)">🎪 Tenue de stand (Créneau 1)</option>
+              <option value="Tenue de stand (Créneau 2)">🎪 Tenue de stand (Créneau 2)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-medium text-gray-700 mb-1">Ou préciser un créneau / détail personnalisé</label>
+            <input
+              type="text"
+              value={customTask}
+              onChange={(e) => setCustomTask(e.target.value)}
+              placeholder="Ex: Buvette de 14h à 16h..."
+              className="w-full p-2 border rounded text-xs text-gray-900 bg-white"
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-purple-700 hover:bg-purple-800 text-white text-xs py-2 rounded transition font-medium cursor-pointer"
+        >
+          {loading ? "Inscription..." : "✨ Valider ma participation"}
+        </button>
+      </form>
+
+      {/* Liste des inscrits */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-gray-700">Bénévoles inscrits par poste :</p>
+        {participants.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {participants.map((p) => {
+              const isMe = p.user_id === user?.id
+              return (
+                <div key={p.id} className="flex justify-between items-center p-2.5 bg-white border rounded-lg text-xs">
+                  <div>
+                    <span className="font-bold text-purple-700 block">{p.task_name}</span>
+                    <span className="text-gray-600">👤 {p.user_name}</span>
+                  </div>
+                  {isMe && (
+                    <button
+                      type="button"
+                      onClick={() => handleLeave(p.id)}
+                      className="text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 py-1 rounded font-medium cursor-pointer"
+                    >
+                      Se désinscrire
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 italic text-center py-2">Aucun inscrit pour le moment. Soyez le premier !</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function EventsPage() {
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
@@ -194,7 +332,6 @@ export default function EventsPage() {
   const [imageUrl, setImageUrl] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Champs du formulaire de création d'événement
   const [title, setTitle] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [location, setLocation] = useState('')
@@ -224,15 +361,10 @@ export default function EventsPage() {
   }, [])
 
   const fetchEvents = async () => {
-    const { data: eventsData, error } = await supabase
+    const { data: eventsData } = await supabase
       .from('events')
       .select('*')
       .order('event_date', { ascending: true })
-      
-    if (error) {
-      console.error("Erreur fetchEvents:", error)
-    }
-    
     setEvents(eventsData || [])
   }
 
@@ -243,17 +375,8 @@ export default function EventsPage() {
 
   const handleDeleteEvent = async (eventId: string) => {
     if (!confirm("Voulez-vous vraiment supprimer cet événement ?")) return
-
-    const { error } = await supabase
-      .from('events')
-      .delete()
-      .eq('id', eventId)
-
-    if (error) {
-      alert("Erreur lors de la suppression : " + error.message)
-    } else {
-      fetchEvents()
-    }
+    await supabase.from('events').delete().eq('id', eventId)
+    fetchEvents()
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -277,8 +400,7 @@ export default function EventsPage() {
 
       setImageUrl(data.publicUrl)
     } catch (error: any) {
-      console.error("Erreur upload:", error)
-      alert("Erreur lors de l'upload de l'image : " + error.message)
+      alert("Erreur lors de l'upload : " + error.message)
     } finally {
       setUploading(false)
     }
@@ -291,7 +413,6 @@ export default function EventsPage() {
     }
 
     setLoading(true)
-
     try {
       const { error } = await supabase.from('events').insert({
         title,
@@ -301,7 +422,7 @@ export default function EventsPage() {
         visibility,
         is_internal: visibility !== 'public',
         image_url: imageUrl || null,
-      }).select()
+      })
 
       if (error) throw error
 
@@ -314,8 +435,7 @@ export default function EventsPage() {
       setImageUrl('')
       fetchEvents()
     } catch (error: any) {
-      console.error("Erreur attrapée dans catch:", error)
-      alert("Erreur lors de la publication : " + (error.message || JSON.stringify(error)))
+      alert("Erreur lors de la publication : " + error.message)
     } finally {
       setLoading(false)
     }
@@ -411,8 +531,8 @@ export default function EventsPage() {
                   onChange={handleImageUpload}
                   className="w-full text-sm p-2 rounded-lg border bg-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200 text-gray-900" 
                 />
-                {uploading && <p className="text-xs text-purple-600 mt-1">Téléchargement de l'image en cours...</p>}
-                {imageUrl && <p className="text-xs text-emerald-600 mt-1">✓ Image prête à être publiée</p>}
+                {uploading && <p className="text-xs text-purple-600 mt-1">Téléchargement en cours...</p>}
+                {imageUrl && <p className="text-xs text-emerald-600 mt-1">✓ Image prête</p>}
               </div>
 
               <div className="md:col-span-2 flex justify-end pt-2 border-t border-purple-200">
@@ -432,112 +552,75 @@ export default function EventsPage() {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-800">Prochains événements</h2>
           {events && events.length > 0 ? (
-            events.map((event) => {
-              const isRegistered = event.event_volunteers?.some(
-                (v: { user_id: string }) => v.user_id === user.id
-              );
-
-              return (
-                <div 
-                  key={event.id} 
-                  id={`event-${event.id}`} 
-                  className={`bg-white border rounded-xl p-6 shadow-sm space-y-4 scroll-mt-20 ${
-                    event.visibility === 'secretariat' ? 'border-red-300 bg-red-50/30' : event.visibility === 'codir' ? 'border-purple-300 bg-purple-50/30' : ''
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        {event.visibility === 'secretariat' && (
-                          <span className="text-[10px] font-bold uppercase bg-red-100 text-red-800 px-2 py-0.5 rounded border border-red-200">
-                            Secrétariat
-                          </span>
-                        )}
-                        {event.visibility === 'codir' && (
-                          <span className="text-[10px] font-bold uppercase bg-purple-100 text-purple-800 px-2 py-0.5 rounded border border-purple-200">
-                            CODIR
-                          </span>
-                        )}
-                        <h3 className="font-bold text-gray-900 text-xl">{event.title}</h3>
-                      </div>
-                      {event.location && <p className="text-xs text-gray-500">📍 {event.location}</p>}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-semibold px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {new Date(event.event_date).toLocaleDateString("fr-FR", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
-                      </span>
-
-                      {isBureau && (
-                        <button
-                          onClick={() => handleDeleteEvent(event.id)}
-                          className="text-xs text-red-600 hover:text-red-800 font-medium px-2.5 py-1 rounded border border-red-200 hover:bg-red-50 transition cursor-pointer"
-                          title="Supprimer l'événement"
-                        >
-                          🗑️ Supprimer
-                        </button>
+            events.map((event) => (
+              <div 
+                key={event.id} 
+                className={`bg-white border rounded-xl p-6 shadow-sm space-y-4 ${
+                  event.visibility === 'secretariat' ? 'border-red-300 bg-red-50/30' : event.visibility === 'codir' ? 'border-purple-300 bg-purple-50/30' : ''
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      {event.visibility === 'secretariat' && (
+                        <span className="text-[10px] font-bold uppercase bg-red-100 text-red-800 px-2 py-0.5 rounded border border-red-200">
+                          Secrétariat
+                        </span>
                       )}
+                      {event.visibility === 'codir' && (
+                        <span className="text-[10px] font-bold uppercase bg-purple-100 text-purple-800 px-2 py-0.5 rounded border border-red-200">
+                          CODIR
+                        </span>
+                      )}
+                      <h3 className="font-bold text-gray-900 text-xl">{event.title}</h3>
                     </div>
+                    {event.location && <p className="text-xs text-gray-500">📍 {event.location}</p>}
                   </div>
 
-                  {event.image_url && (
-                    <div className="w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center">
-                      <img
-                        src={event.image_url}
-                        alt={event.title}
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-semibold px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {new Date(event.event_date).toLocaleDateString("fr-FR", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      })}
+                    </span>
 
-                  {event.description && <p className="text-sm text-gray-600">{event.description}</p>}
-
-                  {/* Section des tâches réservée aux membres du bureau */}
-                  {isBureau && (
-                    <EventTasksManager eventId={event.id} members={bureauMembers} />
-                  )}
-
-{/* Section Trésorerie réservée aux membres du bureau */}
-{isBureau && (
-  <EventFinanceManager eventId={event.id} />
-)}
-                  <div className="pt-3 border-t flex items-center justify-between">
-                    <div className="text-xs text-gray-500">
-                      👥 <strong>{event.event_volunteers?.length || 0}</strong> bénévole(s) inscrit(s)
-                    </div>
-
-                    {isRegistered ? (
-                      <span className="text-xs bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-200 font-medium">
-                        ✓ Vous êtes inscrit comme bénévole
-                      </span>
-                    ) : (
-                      <form action={registerVolunteer} className="flex gap-2">
-                        <input type="hidden" name="eventId" value={event.id} />
-                        <input
-                          type="text"
-                          name="roleNeeded"
-                          placeholder="Ex: Tenue de stand..."
-                          className="text-xs px-3 py-1.5 border rounded-lg focus:outline-purple-600 bg-white"
-                          required
-                        />
-                        <button
-                          type="submit"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition"
-                        >
-                          Je participe
-                        </button>
-                      </form>
+                    {isBureau && (
+                      <button
+                        onClick={() => handleDeleteEvent(event.id)}
+                        className="text-xs text-red-600 hover:text-red-800 font-medium px-2.5 py-1 rounded border border-red-200 hover:bg-red-50 transition cursor-pointer"
+                      >
+                        🗑️ Supprimer
+                      </button>
                     )}
                   </div>
                 </div>
-              );
-            })
+
+                {event.image_url && (
+                  <div className="w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center">
+                    <img src={event.image_url} alt={event.title} className="w-full h-full object-contain" />
+                  </div>
+                )}
+
+                {event.description && <p className="text-sm text-gray-600">{event.description}</p>}
+
+                {/* Tâches internes réservées au Bureau */}
+                {isBureau && (
+                  <EventTasksManager eventId={event.id} members={bureauMembers} />
+                )}
+
+                {/* Trésorerie réservée au Bureau */}
+                {isBureau && (
+                  <EventFinanceManager eventId={event.id} />
+                )}
+
+                {/* Inscriptions interactives par tâche/créneau ouvertes à tous */}
+                <EventParticipationManager eventId={event.id} isBureau={isBureau} user={user} profile={profile} />
+              </div>
+            ))
           ) : (
             <div className="bg-white border rounded-xl p-8 text-center text-gray-500 text-sm">
               Aucun événement prévu pour le moment.
