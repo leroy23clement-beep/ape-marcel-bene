@@ -71,7 +71,7 @@ export default function BureauPage() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-semibold text-gray-800">📅 Calendrier des réunions</h3>
                   <span className="text-xs text-purple-700 font-medium">Accéder →</span>
-                </h3>
+                </div>
                 <p className="text-xs text-gray-600">
                   Consulter les dates des réunions de préparation et points internes.
                 </p>
@@ -85,7 +85,7 @@ export default function BureauPage() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-semibold text-gray-800">👥 Trombinoscope (Qui sommes-nous)</h3>
                   <span className="text-xs text-purple-700 font-medium">Gérer →</span>
-                </h3>
+                </div>
                 <p className="text-xs text-gray-600">
                   Ajouter ou modifier les membres de l'équipe affichés publiquement.
                 </p>
