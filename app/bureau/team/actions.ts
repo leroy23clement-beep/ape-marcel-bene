@@ -24,10 +24,34 @@ export async function addTeamMember(formData: FormData) {
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
   const roleTitle = formData.get("roleTitle") as string;
-  const photoUrl = formData.get("photoUrl") as string;
+  const photoFile = formData.get("photoFile") as File;
 
   if (!firstName || !lastName || !roleTitle) {
     throw new Error("Veuillez remplir les champs obligatoires");
+  }
+
+  let photoUrl = null;
+
+  // Gestion de l'upload de la photo si un fichier est présent
+  if (photoFile && photoFile.size > 0 && photoFile.name !== "undefined") {
+    const fileExt = photoFile.name.split(".").pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("team-photos")
+      .upload(filePath, photoFile);
+
+    if (uploadError) {
+      throw new Error("Erreur lors de l'upload de la photo : " + uploadError.message);
+    }
+
+    // Récupération de l'URL publique de l'image
+    const { data: publicUrlData } = supabase.storage
+      .from("team-photos")
+      .getPublicUrl(filePath);
+
+    photoUrl = publicUrlData.publicUrl;
   }
 
   // Insertion dans la table bureau_members
@@ -35,7 +59,7 @@ export async function addTeamMember(formData: FormData) {
     first_name: firstName,
     last_name: lastName,
     role_title: roleTitle,
-    photo_url: photoUrl || null,
+    photo_url: photoUrl,
   });
 
   if (error) {
@@ -43,5 +67,6 @@ export async function addTeamMember(formData: FormData) {
   }
 
   revalidatePath("/team");
+  revalidatePath("/about");
   revalidatePath("/bureau/team");
 }

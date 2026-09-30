@@ -16,13 +16,11 @@ export default async function ManageTeamPage() {
     .eq("id", user.id)
     .single();
 
-  // Sécurité : Vérification du rôle bureau ou supérieur
   const allowedRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau'];
   if (!profile || !allowedRoles.includes(profile.role?.toLowerCase())) {
     redirect("/dashboard");
   }
 
-  // Récupération des membres existants
   const { data: members } = await supabase
     .from("bureau_members")
     .select("*")
@@ -37,11 +35,11 @@ export default async function ManageTeamPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Gestion du Trombinoscope</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Ajoutez ou mettez à jour les membres affichés dans la page "Qui sommes-nous ?".
+              Ajoutez ou mettez à jour les membres affichés dans la page de présentation.
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/team" target="_blank" className="text-sm font-medium text-purple-700 hover:underline">
+            <Link href="/about" target="_blank" className="text-sm font-medium text-purple-700 hover:underline">
               Voir la page publique ↗
             </Link>
             <Link href="/bureau" className="text-sm font-medium text-gray-600 hover:underline">
@@ -90,12 +88,12 @@ export default async function ManageTeamPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">URL de la photo (optionnel)</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Photo depuis le PC (optionnel)</label>
                 <input
-                  type="url"
-                  name="photoUrl"
-                  placeholder="https://exemple.com/photo.jpg"
-                  className="w-full p-2 border rounded-md text-sm text-gray-900"
+                  type="file"
+                  name="photoFile"
+                  accept="image/*"
+                  className="w-full p-1.5 border rounded-md text-sm text-gray-900 bg-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
                 />
               </div>
             </div>
@@ -118,7 +116,7 @@ export default async function ManageTeamPage() {
               members.map((member) => (
                 <div key={member.id} className="p-3 bg-gray-50 border rounded-lg flex justify-between items-center">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center font-bold text-purple-700 text-xs">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-purple-100 flex items-center justify-center font-bold text-purple-700 text-xs shrink-0">
                       {member.photo_url ? (
                         <img src={member.photo_url} alt="" className="w-full h-full object-cover" />
                       ) : (
