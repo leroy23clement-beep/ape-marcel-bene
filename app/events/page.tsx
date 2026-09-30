@@ -5,16 +5,195 @@ import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { registerVolunteer } from '@/lib/actions/events'
 
+// Composant interne pour gérer les tâches d'un événement
+function EventTasksManager({ eventId, members }: { eventId: string; members: any[] }) {
+  const [tasks, setTasks] = useState<any[]>([])
+  const [title, setTitle] = useState('')
+  const [dueDate, setDueDate] = useState('')
+  const [priority, setPriority] = useState('moyenne')
+  const [assignedTo, setAssignedTo] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchTasks()
+  }, [eventId])
+
+  async function fetchTasks() {
+    const { data } = await supabase
+      .from('event_tasks')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('due_date', { ascending: true })
+    if (data) setTasks(data)
+  }
+
+  async function handleAddTask(e: React.FormEvent) {
+    e.preventDefault()
+    if (!title) return
+    setLoading(true)
+
+    const { error } = await supabase.from('event_tasks').insert({
+      event_id: eventId,
+      title,
+      due_date: dueDate || null,
+      priority,
+      assigned_to: assignedTo || null,
+    })
+
+    if (!error) {
+      setTitle('')
+      setDueDate('')
+      setPriority('moyenne')
+      setAssignedTo('')
+      fetchTasks()
+    } else {
+      alert("Erreur lors de l'ajout de la tâche : " + error.message)
+    }
+    setLoading(false)
+  }
+
+  async function toggleTask(id: string, currentStatus: boolean) {
+    await supabase.from('event_tasks').update({ completed: !currentStatus }).eq('id', id)
+    fetchTasks()
+  }
+
+  async function deleteTask(id: string) {
+    if (!confirm("Supprimer cette tâche ?")) return
+    await supabase.from('event_tasks').delete().eq('id', id)
+    fetchTasks()
+  }
+
+  const priorityBadge = (p: string) => {
+    switch (p) {
+      case 'haute': return <span className="px-2 py-0.5 text-[10px] bg-red-100 text-red-700 rounded-full font-semibold uppercase">Haute</span>
+      case 'moyenne': return <span className="px-2 py-0.5 text-[10px] bg-orange-100 text-orange-700 rounded-full font-semibold uppercase">Moyenne</span>
+      default: return <span className="px-2 py-0.5 text-[10px] bg-green-100 text-green-700 rounded-full font-semibold uppercase">Basse</span>
+    }
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200 space-y-4 bg-gray-50/70 p-4 rounded-xl">
+      <h4 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+        <span>📋</span> Tâches à faire pour cet événement ({tasks.length})
+      </h4>
+
+      {/* Formulaire d'ajout de tâche */}
+      <form onSubmit={handleAddTask} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5 items-end bg-white p-3 rounded-lg border shadow-xs">
+        <div className="md:col-span-2">
+          <label className="block text-[11px] font-medium text-gray-700 mb-1">Nouvelle tâche *</label>
+          <input
+            type="text"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex: Acheter le matériel..."
+            className="w-full p-2 border rounded text-xs text-gray-900 bg-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-gray-700 mb-1">Échéance</label>
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="w-full p-2 border rounded text-xs text-gray-900 bg-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-gray-700 mb-1">Priorité</label>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="w-full p-2 border rounded text-xs text-gray-900 bg-white"
+          >
+            <option value="basse">Basse</option>
+            <option value="moyenne">Moyenne</option>
+            <option value="haute">Haute</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-medium text-gray-700 mb-1">Assigné à</label>
+          <select
+            value={assignedTo}
+            onChange={(e) => setAssignedTo(e.target.value)}
+            className="w-full p-2 border rounded text-xs text-gray-900 bg-white"
+          >
+            <option value="">Personne</option>
+            {members.map((m) => (
+              <option key={m.id} value={`${m.first_name} ${m.last_name || ''}`}>
+                {m.first_name} {m.last_name || ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="md:col-span-5 bg-purple-700 hover:bg-purple-800 text-white text-xs py-2 rounded transition font-medium cursor-pointer"
+        >
+          + Ajouter la tâche
+        </button>
+      </form>
+
+      {/* Liste des tâches */}
+      <div className="space-y-2">
+        {tasks.length > 0 ? (
+          tasks.map((task) => (
+            <div key={task.id} className={`flex items-center justify-between p-2.5 border rounded-lg transition ${task.completed ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={task.completed}
+                  onChange={() => toggleTask(task.id, task.completed)}
+                  className="w-4 h-4 text-purple-600 rounded cursor-pointer"
+                />
+                <div>
+                  <p className={`text-xs font-semibold text-gray-900 ${task.completed ? 'line-through text-gray-500' : ''}`}>
+                    {task.title}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-500">
+                    {task.due_date && <span>📅 Échéance : {new Date(task.due_date).toLocaleDateString('fr-FR')}</span>}
+                    {task.assigned_to && <span>👤 Assigné à : <strong className="text-gray-700">{task.assigned_to}</strong></span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                {priorityBadge(task.priority)}
+                <button
+                  onClick={() => deleteTask(task.id)}
+                  className="text-[11px] text-red-600 hover:text-red-800 font-medium px-2 py-1 bg-red-50 hover:bg-red-100 rounded cursor-pointer"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-xs text-gray-500 italic text-center py-2">Aucune tâche enregistrée pour cet événement.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function EventsPage() {
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [events, setEvents] = useState<any[]>([])
+  const [bureauMembers, setBureauMembers] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Champs du formulaire
+  // Champs du formulaire de création d'événement
   const [title, setTitle] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [location, setLocation] = useState('')
@@ -38,6 +217,7 @@ export default function EventsPage() {
       setProfile(profileData)
 
       fetchEvents()
+      fetchBureauMembers()
     }
     loadData()
   }, [])
@@ -53,6 +233,11 @@ export default function EventsPage() {
     }
     
     setEvents(eventsData || [])
+  }
+
+  const fetchBureauMembers = async () => {
+    const { data } = await supabase.from('profiles').select('*')
+    if (data) setBureauMembers(data)
   }
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -107,7 +292,7 @@ export default function EventsPage() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.from('events').insert({
+      const { error } = await supabase.from('events').insert({
         title,
         description,
         event_date: eventDate,
@@ -300,7 +485,6 @@ export default function EventsPage() {
                     </div>
                   </div>
 
-                  {/* Affichage direct de l'image en entier sans rognage */}
                   {event.image_url && (
                     <div className="w-full h-48 sm:h-64 rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center">
                       <img
@@ -312,6 +496,11 @@ export default function EventsPage() {
                   )}
 
                   {event.description && <p className="text-sm text-gray-600">{event.description}</p>}
+
+                  {/* Section des tâches réservée aux membres du bureau */}
+                  {isBureau && (
+                    <EventTasksManager eventId={event.id} members={bureauMembers} />
+                  )}
 
                   <div className="pt-3 border-t flex items-center justify-between">
                     <div className="text-xs text-gray-500">
