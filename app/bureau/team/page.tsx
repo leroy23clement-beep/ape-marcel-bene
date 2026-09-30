@@ -64,13 +64,15 @@ export default function ManageTeamPage() {
     if (data) setMembers(data);
   }
 
-  // 2. Gestion de l'ajout d'un membre directement côté client (évite l'erreur 500 des Server Actions)
+  // 2. Gestion de l'ajout d'un membre directement côté client
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
 
-    const formData = new FormData(e.currentTarget);
+    // On sauvegarde la référence du formulaire tout de suite avant les "await"
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
     const roleTitle = formData.get('roleTitle') as string;
@@ -111,8 +113,8 @@ export default function ManageTeamPage() {
         throw new Error("Erreur d'insertion dans la base : " + insertError.message);
       }
 
-      // Réinitialiser le formulaire et recharger la liste des membres
-      e.currentTarget.reset();
+      // Réinitialiser le formulaire via la variable sauvegardée et recharger la liste
+      form.reset();
       await fetchMembers();
     } catch (err: any) {
       console.error(err);
