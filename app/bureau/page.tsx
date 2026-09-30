@@ -63,6 +63,34 @@ export default function BureauPage() {
 
             {/* Grille des outils du bureau */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Carte Suivi des tâches */}
+              <Link 
+                href="/bureau/taches"
+                className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-gray-800">📋 Suivi des tâches</h3>
+                  <span className="text-xs text-purple-700 font-medium">Accéder →</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Vue d'ensemble des tâches par événement avec vos attributions en surbrillance.
+                </p>
+              </Link>
+
+              {/* Carte Documents & PV */}
+              <Link 
+                href="/bureau/documents"
+                className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-gray-800">📂 Documents & PV</h3>
+                  <span className="text-xs text-purple-700 font-medium">Accéder →</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Téléchargez et consultez les comptes-rendus, statuts et règlements de l'association.
+                </p>
+              </Link>
+
               {/* Carte Calendrier des réunions */}
               <Link 
                 href="/bureau/calendar"
