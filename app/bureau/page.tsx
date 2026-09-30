@@ -76,6 +76,20 @@ export default function BureauPage() {
                   Consulter les dates des réunions de préparation et points internes.
                 </p>
               </Link>
+
+              {/* Carte Gestion du Trombinoscope */}
+              <Link 
+                href="/bureau/team"
+                className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-gray-800">👥 Trombinoscope (Qui sommes-nous)</h3>
+                  <span className="text-xs text-purple-700 font-medium">Gérer →</span>
+                </h3>
+                <p className="text-xs text-gray-600">
+                  Ajouter ou modifier les membres de l'équipe affichés publiquement.
+                </p>
+              </Link>
             </div>
           </div>
         ) : (
