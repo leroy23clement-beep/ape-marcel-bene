@@ -1,5 +1,6 @@
 'use client'
 
+import EventFinanceManager from '@/components/EventFinanceManager'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
@@ -502,6 +503,10 @@ export default function EventsPage() {
                     <EventTasksManager eventId={event.id} members={bureauMembers} />
                   )}
 
+{/* Section Trésorerie réservée aux membres du bureau */}
+{isBureau && (
+  <EventFinanceManager eventId={event.id} />
+)}
                   <div className="pt-3 border-t flex items-center justify-between">
                     <div className="text-xs text-gray-500">
                       👥 <strong>{event.event_volunteers?.length || 0}</strong> bénévole(s) inscrit(s)
