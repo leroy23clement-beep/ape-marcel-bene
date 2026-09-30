@@ -66,6 +66,27 @@ export default async function DashboardPage() {
 
       <div className="mx-auto max-w-4xl p-6 flex flex-col space-y-6">
         
+        {/* Encadré de présentation APE */}
+        <div className="rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-800 text-white p-6 shadow-md flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="space-y-2 text-center md:text-left">
+            <span className="bg-purple-600 text-purple-100 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider border border-purple-400">
+              Association des Parents d'Élèves
+            </span>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+              APE Marcel Béné, ensemble pour les enfants
+            </h1>
+            <p className="text-purple-100 text-sm max-w-xl">
+              Une association loi 1901 à but non lucratif. Pour financer les projets pédagogiques, les sorties et les équipements des écoles de Muizon, grâce à l'implication de tous !
+            </p>
+          </div>
+          <Link
+            href="/about"
+            className="bg-white text-purple-800 hover:bg-purple-50 font-semibold px-6 py-3 rounded-xl shadow transition text-sm whitespace-nowrap cursor-pointer"
+          >
+            Découvrir l'association →
+          </Link>
+        </div>
+
         {/* 1. Indicateurs Financiers */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
@@ -147,9 +168,17 @@ export default async function DashboardPage() {
 
         {/* 3. Prochains Événements */}
         <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
-          <h2 className="font-semibold text-gray-800 text-lg border-b pb-2">
-            Prochains Événements
-          </h2>
+          <div className="flex justify-between items-center border-b pb-2">
+            <h2 className="font-semibold text-gray-800 text-lg">
+              Prochains Événements
+            </h2>
+            <Link 
+              href="/events" 
+              className="text-xs font-medium text-purple-700 hover:underline"
+            >
+              Voir les événements ↗
+            </Link>
+          </div>
 
           <div className="space-y-3">
             {upcomingEvents && upcomingEvents.length > 0 ? (
