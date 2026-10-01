@@ -98,9 +98,9 @@ export default async function DashboardPage() {
         {/* 1. Indicateurs Financiers */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
-          {/* Bloc Bénéfices Cliquable */}
+          {/* Bloc Bénéfices Cliquable redirigeant vers /finance */}
           <Link 
-            href="/dashboard/profits"
+            href="/finance"
             className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between hover:border-purple-500 transition cursor-pointer group"
           >
             <div>
