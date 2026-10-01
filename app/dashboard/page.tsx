@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { addChild } from "@/lib/actions/children";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
+import HolidayCountdown from "@/components/HolidayCountdown";
+import ApeEventCountdown from "@/components/ApeEventCountdown";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -85,6 +87,12 @@ export default async function DashboardPage() {
           >
             Découvrir l'association →
           </Link>
+        </div>
+
+        {/* Comptes à rebours placés juste en dessous */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <HolidayCountdown />
+          <ApeEventCountdown />
         </div>
 
         {/* 1. Indicateurs Financiers */}

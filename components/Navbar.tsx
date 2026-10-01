@@ -23,6 +23,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     { name: 'Tableau de bord', href: '/dashboard' },
     { name: 'Événements', href: '/events' },
     { name: 'Boutique', href: '/shop' },
+    { name: '🎨 Concours Logo', href: '/logo-contest' },
     { name: 'Don', href: '/membership' },
     ...(isBureau ? [{ name: 'Espace Bureau', href: '/bureau' }] : []),
   ]
@@ -71,7 +72,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
             </div>
             <button
               onClick={handleLogout}
-              className="text-xs font-medium text-red-600 hover:text-red-800 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition"
+              className="text-xs font-medium text-red-600 hover:text-red-800 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition cursor-pointer"
             >
               Déconnexion
             </button>
@@ -118,7 +119,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
           <div className="pt-2 border-t">
             <button
               onClick={handleLogout}
-              className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 transition"
+              className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 transition cursor-pointer"
             >
               Déconnexion
             </button>
