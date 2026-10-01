@@ -45,7 +45,7 @@ export default function Footer() {
               <li>
                 <button 
                   onClick={() => setIsOpen(true)}
-                  className="hover:text-white underline underline-offset-4 text-left transition"
+                  className="hover:text-white underline underline-offset-4 text-left transition cursor-pointer"
                 >
                   ✉️ Nous contacter
                 </button>
@@ -78,10 +78,17 @@ export default function Footer() {
             <p className="text-gray-400 leading-relaxed">
               Association Loi 1901 à but non lucratif. Les données collectées sur ce site servent uniquement à la gestion interne de l'APE.
             </p>
-            <div>
-              <Link href="/qui-sommes-nous" className="text-purple-400 hover:text-purple-300 underline underline-offset-2 font-medium">
-                → Qui sommes-nous ?
-              </Link>
+            <div className="space-y-1 pt-1">
+              <div>
+                <Link href="/qui-sommes-nous" className="text-purple-400 hover:text-purple-300 underline underline-offset-2 font-medium">
+                  → Qui sommes-nous ?
+                </Link>
+              </div>
+              <div>
+                <Link href="/privacy" className="text-purple-400 hover:text-purple-300 underline underline-offset-2 font-medium">
+                  → Politique de confidentialité & RGPD
+                </Link>
+              </div>
             </div>
             <p className="text-gray-500 text-[11px] pt-2">
               © {new Date().getFullYear()} APE Marcel Béné — Tous droits réservés.
@@ -97,7 +104,7 @@ export default function Footer() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 text-gray-900 relative">
             <button 
               onClick={() => setIsOpen(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold cursor-pointer"
             >
               ✕
             </button>
@@ -118,7 +125,7 @@ export default function Footer() {
                   <input 
                     type="text" 
                     required 
-                    className="w-full text-xs p-2.5 border rounded-lg bg-gray-50 focus:bg-white" 
+                    className="w-full text-xs p-2.5 border rounded-lg bg-gray-50 focus:bg-white text-gray-900" 
                     placeholder="ex: Jean Dupont"
                   />
                 </div>
@@ -128,7 +135,7 @@ export default function Footer() {
                   <input 
                     type="email" 
                     required 
-                    className="w-full text-xs p-2.5 border rounded-lg bg-gray-50 focus:bg-white" 
+                    className="w-full text-xs p-2.5 border rounded-lg bg-gray-50 focus:bg-white text-gray-900" 
                     placeholder="ex: jean.dupont@email.com"
                   />
                 </div>
@@ -138,7 +145,7 @@ export default function Footer() {
                   <input 
                     type="text" 
                     required 
-                    className="w-full text-xs p-2.5 border rounded-lg bg-gray-50 focus:bg-white" 
+                    className="w-full text-xs p-2.5 border rounded-lg bg-gray-50 focus:bg-white text-gray-900" 
                     placeholder="ex: Question sur la fête de l'école"
                   />
                 </div>
@@ -148,7 +155,7 @@ export default function Footer() {
                   <textarea 
                     rows={4} 
                     required 
-                    className="w-full text-xs p-2.5 border rounded-lg bg-gray-50 focus:bg-white" 
+                    className="w-full text-xs p-2.5 border rounded-lg bg-gray-50 focus:bg-white text-gray-900" 
                     placeholder="Votre message..."
                   />
                 </div>
@@ -157,13 +164,13 @@ export default function Footer() {
                   <button
                     type="button"
                     onClick={() => setIsOpen(false)}
-                    className="px-4 py-2 text-xs font-medium text-gray-600 border rounded-lg hover:bg-gray-100"
+                    className="px-4 py-2 text-xs font-medium text-gray-600 border rounded-lg hover:bg-gray-100 cursor-pointer"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-xs font-medium text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition"
+                    className="px-4 py-2 text-xs font-medium text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition cursor-pointer"
                   >
                     Envoyer
                   </button>
