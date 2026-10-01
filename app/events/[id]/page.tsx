@@ -4,7 +4,6 @@ import Navbar from "@/components/Navbar"
 import Link from "next/link"
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  // On attend la résolution des params (requis dans les versions récentes de Next.js)
   const resolvedParams = await params;
   const eventId = resolvedParams.id;
 
@@ -13,7 +12,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = user ? await supabase.from('profiles').select('*').eq('id', user.id).single() : { data: null }
 
-  // Récupérer l'événement spécifique grâce à l'ID dynamique résolu
+  // Récupérer l'événement spécifique grâce à l'ID dynamique
   const { data: event } = await supabase
     .from('events')
     .select('*')
@@ -41,6 +40,18 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
         {/* Détails de l'événement */}
         <div className="bg-white border rounded-2xl p-8 shadow-sm space-y-6">
+          
+          {/* Affiche de l'événement (si elle existe dans Supabase) */}
+          {event.image_url && (
+            <div className="rounded-xl overflow-hidden border bg-gray-100 flex justify-center p-2">
+              <img 
+                src={event.image_url} 
+                alt={event.title} 
+                className="max-h-[500px] w-auto object-contain rounded-lg"
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
             <h1 className="text-3xl font-extrabold text-purple-900 tracking-tight">
               {event.title}
