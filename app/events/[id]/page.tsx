@@ -3,17 +3,21 @@ import { notFound } from "next/navigation"
 import Navbar from "@/components/Navbar"
 import Link from "next/link"
 
-export default async function EventDetailPage({ params }: { params: { id: string } }) {
+export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  // On attend la résolution des params (requis dans les versions récentes de Next.js)
+  const resolvedParams = await params;
+  const eventId = resolvedParams.id;
+
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = user ? await supabase.from('profiles').select('*').eq('id', user.id).single() : { data: null }
 
-  // Récupérer l'événement spécifique grâce à l'ID dynamique dans l'URL
+  // Récupérer l'événement spécifique grâce à l'ID dynamique résolu
   const { data: event } = await supabase
     .from('events')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', eventId)
     .single()
 
   if (!event) {
