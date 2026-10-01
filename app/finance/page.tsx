@@ -28,11 +28,7 @@ export default function FinancePage() {
         .single()
       setProfile(profileData)
 
-      // Vérification des droits bureau
-      if (profileData?.role === 'parent') {
-        window.location.href = '/dashboard'
-        return
-      }
+      // La restriction de rôle a été retirée pour permettre à tous les parents de consulter les finances
 
       fetchFinancialData()
     }
@@ -95,7 +91,7 @@ export default function FinancePage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Bilan Financier & Bénéfices</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Récapitulatif du chiffre d'affaires et des volumes générés par chaque manifestation.
+              Récapitulatif transparent du chiffre d'affaires et des volumes générés par chaque manifestation.
             </p>
           </div>
           <button
