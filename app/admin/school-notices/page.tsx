@@ -12,6 +12,7 @@ export default function AdminSchoolNoticesPage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [category, setCategory] = useState('info')
+  const [noticeDate, setNoticeDate] = useState(new Date().toISOString().split('T')[0]) // Date du jour par défaut
 
   useEffect(() => {
     async function load() {
@@ -38,7 +39,7 @@ export default function AdminSchoolNoticesPage() {
     const { data } = await supabase
       .from('school_notices')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('notice_date', { ascending: false }) // Tri par date de l'information
     if (data) setNotices(data)
   }
 
@@ -46,11 +47,12 @@ export default function AdminSchoolNoticesPage() {
     e.preventDefault()
     const { error } = await supabase
       .from('school_notices')
-      .insert([{ title, content, category }])
+      .insert([{ title, content, category, notice_date: noticeDate }])
 
     if (!error) {
       setTitle('')
       setContent('')
+      setNoticeDate(new Date().toISOString().split('T')[0])
       fetchNotices()
     } else {
       alert("Erreur lors de l'ajout")
@@ -74,14 +76,22 @@ export default function AdminSchoolNoticesPage() {
         {/* Formulaire d'ajout */}
         <form onSubmit={handleAddNotice} className="bg-white border p-5 rounded-xl shadow-sm space-y-4">
           <h2 className="font-semibold text-gray-800 text-sm">Ajouter une information école</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input
               type="text"
               placeholder="Titre (ex: 📸 Photos de classe)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="p-2 border rounded-md text-sm text-gray-900"
+              className="p-2 border rounded-md text-sm text-gray-900 md:col-span-1"
+            />
+            <input
+              type="date"
+              value={noticeDate}
+              onChange={(e) => setNoticeDate(e.target.value)}
+              required
+              className="p-2 border rounded-md text-sm bg-white text-gray-900"
             />
             <select
               value={category}
@@ -93,6 +103,7 @@ export default function AdminSchoolNoticesPage() {
               <option value="trip">Sortie scolaire</option>
             </select>
           </div>
+
           <textarea
             placeholder="Contenu du message..."
             value={content}
@@ -113,20 +124,33 @@ export default function AdminSchoolNoticesPage() {
         <div className="bg-white border rounded-xl p-5 shadow-sm space-y-3">
           <h2 className="font-semibold text-gray-800 text-sm border-b pb-2">Informations actuellement publiées</h2>
           {notices.length > 0 ? (
-            notices.map((notice) => (
-              <div key={notice.id} className="flex justify-between items-start bg-gray-50 p-3 rounded-lg border">
-                <div>
-                  <h3 className="font-bold text-xs text-gray-900">{notice.title}</h3>
-                  <p className="text-xs text-gray-600 mt-1">{notice.content}</p>
+            notices.map((notice) => {
+              const formattedDate = notice.notice_date 
+                ? new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                : ''
+
+              return (
+                <div key={notice.id} className="flex justify-between items-start bg-gray-50 p-3 rounded-lg border gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-xs text-gray-900">{notice.title}</h3>
+                      {formattedDate && (
+                        <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                          📅 {formattedDate}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-600">{notice.content}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDelete(notice.id)}
+                    className="text-red-600 hover:text-red-800 text-xs font-medium cursor-pointer shrink-0"
+                  >
+                    Supprimer
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleDelete(notice.id)}
-                  className="text-red-600 hover:text-red-800 text-xs font-medium cursor-pointer"
-                >
-                  Supprimer
-                </button>
-              </div>
-            ))
+              )
+            })
           ) : (
             <p className="text-xs text-gray-500 italic">Aucune information pour le moment.</p>
           )}
