@@ -39,7 +39,7 @@ export default async function AboutPage() {
             L'APE Marcel Béné, <span className="text-purple-700">c'est nous !</span>
           </h1>
           <p className="text-base text-gray-600 max-w-2xl mx-auto">
-            11 membres actifs de l'Association des Parents d'Élèves des écoles Marcel Béné. Une association loi 1901 où tout le monde peut être membre gratuitement.
+            17 membres actifs de l'Association des Parents d'Élèves des écoles Marcel Béné. Une association loi 1901 où tout le monde peut être membre gratuitement.
           </p>
         </header>
 
@@ -66,7 +66,7 @@ export default async function AboutPage() {
           <div className="bg-white border rounded-2xl p-6 shadow-sm space-y-2 border-l-4 border-l-emerald-500">
             <h2 className="text-lg font-bold text-emerald-600 uppercase tracking-wide">🎉 Comment ?</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
-              Au travers de manifestations (vente de gâteaux, boums, kermesse, Babybrac...). Chaque animation est conçue pour récolter des fonds intégralement reversés aux écoles.
+              Au travers de manifestations (vente de gâteaux, boums, kermesse...). Chaque animation est conçue pour récolter des fonds intégralement reversés aux écoles.
             </p>
           </div>
 

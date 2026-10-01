@@ -28,7 +28,7 @@ export default function Footer() {
               APE Marcel Béné
             </h3>
             <p className="text-gray-400">
-              Association des Parents d'Élèves de l'école Marcel Béné à Muizon.
+              Association des Parents d'Élèves Marcel Béné à Muizon.
             </p>
             <p className="text-gray-400 pt-1">
               <strong className="text-gray-300">SIRET :</strong> 80881381000013<br />
