@@ -44,6 +44,12 @@ export default async function DashboardPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
+  // Récupération des actualités de l'école
+  const { data: schoolNotices } = await supabase
+    .from("school_notices")
+    .select("*")
+    .order("created_at", { ascending: false });
+
   // Récupération des statistiques financières de l'association depuis Supabase
   const { data: stats } = await supabase
     .from("association_stats")
@@ -66,7 +72,7 @@ export default async function DashboardPage() {
         role={profile?.role} 
       />
 
-      <div className="mx-auto max-w-4xl p-6 flex flex-col space-y-6">
+      <div className="mx-auto max-w-7xl p-6 flex flex-col space-y-6">
         
         {/* Encadré de présentation APE */}
         <div className="rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-800 text-white p-6 shadow-md flex flex-col md:flex-row justify-between items-center gap-6">
@@ -98,7 +104,7 @@ export default async function DashboardPage() {
         {/* 1. Indicateurs Financiers */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
-          {/* Bloc Bénéfices Cliquable redirigeant vers /finance */}
+          {/* Bloc Bénéfices Cliquable redirigeant vers /finance pour tous */}
           <Link 
             href="/finance"
             className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between hover:border-purple-500 transition cursor-pointer group"
@@ -131,102 +137,139 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* 2. Boutique & Ventes en cours */}
-        <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b pb-2">
-            <h2 className="font-semibold text-gray-800 text-lg">
-              Boutique & Ventes en cours
-            </h2>
-            <Link 
-              href="/shop" 
-              className="text-xs font-medium text-purple-700 hover:underline"
-            >
-              Voir la boutique ↗
-            </Link>
-          </div>
+        {/* Disposition en 3 colonnes pour la suite du contenu */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          
+          {/* COLONNE 1 : Prochains Événements */}
+          <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h2 className="font-semibold text-gray-800 text-base">
+                Prochains Événements
+              </h2>
+              <Link 
+                href="/events" 
+                className="text-xs font-medium text-purple-700 hover:underline"
+              >
+                Voir tout ↗
+              </Link>
+            </div>
 
-          <div className="space-y-3">
-            {products && products.length > 0 ? (
-              products.map((product) => (
-                <Link
-                  key={product.id}
-                  href="/shop"
-                  className="block p-4 bg-gray-50 border rounded-lg space-y-2 hover:border-purple-500 transition cursor-pointer"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-bold text-sm text-gray-900">{product.name}</h3>
-                      {product.description && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{product.description}</p>
-                      )}
+            <div className="space-y-3">
+              {upcomingEvents && upcomingEvents.length > 0 ? (
+                upcomingEvents.map((event) => (
+                  <Link
+                    key={event.id}
+                    href={`/events#event-${event.id}`}
+                    className="block p-3 bg-gray-50 border rounded-lg space-y-1 hover:bg-gray-100 transition cursor-pointer"
+                  >
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-bold text-xs text-gray-900">{event.title}</h3>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                        {new Date(event.event_date).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "short"
+                        })}
+                      </span>
                     </div>
-                    <span className="text-sm font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200 whitespace-nowrap">
-                      {product.price ? (typeof product.price === 'number' ? `${product.price.toFixed(2)} €` : product.price) : ""}
-                    </span>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <p className="text-sm text-gray-500 italic">
-                Aucune vente en cours pour le moment.
-              </p>
-            )}
+                    {event.location && (
+                      <p className="text-[11px] text-gray-500">📍 {event.location}</p>
+                    )}
+                  </Link>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500 italic">
+                  Aucun événement à venir.
+                </p>
+              )}
+            </div>
           </div>
+
+          {/* COLONNE 2 : Boutique & Ventes en cours */}
+          <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h2 className="font-semibold text-gray-800 text-base">
+                Boutique & Ventes
+              </h2>
+              <Link 
+                href="/shop" 
+                className="text-xs font-medium text-purple-700 hover:underline"
+              >
+                Accéder ↗
+              </Link>
+            </div>
+
+            <div className="space-y-3">
+              {products && products.length > 0 ? (
+                products.map((product) => (
+                  <Link
+                    key={product.id}
+                    href="/shop"
+                    className="block p-3 bg-gray-50 border rounded-lg space-y-1 hover:border-purple-500 transition cursor-pointer"
+                  >
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-bold text-xs text-gray-900">{product.name}</h3>
+                      <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 whitespace-nowrap">
+                        {product.price ? `${product.price.toFixed(2)} €` : ""}
+                      </span>
+                    </div>
+                    {product.description && (
+                      <p className="text-[11px] text-gray-500 line-clamp-1">{product.description}</p>
+                    )}
+                  </Link>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500 italic">
+                  Aucune vente en cours.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* COLONNE 3 : Le coin de l'école (Infos & Rappels Dynamiques) */}
+          <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h2 className="font-semibold text-gray-800 text-base flex items-center gap-1.5">
+                <span>🏫</span> Le coin de l'école
+              </h2>
+              {profile?.role !== 'parent' && (
+                <Link href="/admin/school-notices" className="text-[11px] text-purple-700 hover:underline font-medium">
+                  Gérer ⚙️
+                </Link>
+              )}
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {schoolNotices && schoolNotices.length > 0 ? (
+                schoolNotices.map((notice) => (
+                  <div 
+                    key={notice.id} 
+                    className={`p-3 border rounded-lg space-y-1 ${
+                      notice.category === 'photo' ? 'bg-blue-50/60 border-blue-100 text-blue-900' :
+                      notice.category === 'trip' ? 'bg-amber-50/60 border-amber-100 text-amber-900' :
+                      'bg-purple-50/60 border-purple-100 text-purple-900'
+                    }`}
+                  >
+                    <span className="font-bold block">{notice.title}</span>
+                    <p className="text-gray-600">{notice.content}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-gray-500 italic">
+                  Aucune information scolaire pour le moment.
+                </p>
+              )}
+            </div>
+          </div>
+
         </div>
 
-        {/* 3. Prochains Événements */}
-        <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b pb-2">
-            <h2 className="font-semibold text-gray-800 text-lg">
-              Prochains Événements
-            </h2>
-            <Link 
-              href="/events" 
-              className="text-xs font-medium text-purple-700 hover:underline"
-            >
-              Voir les événements ↗
-            </Link>
-          </div>
-
-          <div className="space-y-3">
-            {upcomingEvents && upcomingEvents.length > 0 ? (
-              upcomingEvents.map((event) => (
-                <Link
-                  key={event.id}
-                  href={`/events#event-${event.id}`}
-                  className="block p-3 bg-gray-50 border rounded-lg space-y-1 hover:bg-gray-100 transition cursor-pointer"
-                >
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-sm text-gray-900">{event.title}</h3>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
-                      {new Date(event.event_date).toLocaleDateString("fr-FR", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit"
-                      })}
-                    </span>
-                  </div>
-                  {event.location && (
-                    <p className="text-xs text-gray-500">📍 {event.location}</p>
-                  )}
-                </Link>
-              ))
-            ) : (
-              <p className="text-sm text-gray-500 italic">
-                Aucun événement à venir pour le moment.
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* 4. Mon Foyer & Enfants */}
+        {/* 4. Mon Foyer & Enfants (En bas sur toute la largeur) */}
         <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
           <h2 className="font-semibold text-gray-800 text-lg border-b pb-2">
             Mon Foyer & Enfants
           </h2>
 
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {children && children.length > 0 ? (
               children.map((child) => (
                 <div
@@ -234,7 +277,7 @@ export default async function DashboardPage() {
                   className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border"
                 >
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-gray-900 text-sm">
                       {child.first_name} {child.last_name}
                     </p>
                     <p className="text-xs text-gray-500">
@@ -244,13 +287,13 @@ export default async function DashboardPage() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-gray-500 italic">
+              <p className="text-sm text-gray-500 italic col-span-full">
                 Aucun enfant enregistré pour le moment.
               </p>
             )}
           </div>
 
-          <form action={addChild} className="space-y-3 pt-4 border-t">
+          <form action={addChild} className="space-y-3 pt-4 border-t max-w-xl">
             <h3 className="text-sm font-medium text-gray-700">
               Ajouter un enfant
             </h3>
