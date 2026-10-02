@@ -60,7 +60,6 @@ export default function EventsPage() {
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold text-gray-900">Événements de l'APE</h1>
             
-            {/* Lien direct vers la page dédiée de création avec l'affiche */}
             {profile?.role === 'admin' && (
               <Link
                 href="/admin/events/new"
@@ -102,7 +101,7 @@ export default function EventsPage() {
           </div>
         </div>
 
-        {/* Liste des événements avec liens actifs vers /events/[id] */}
+        {/* Liste des événements */}
         <div className="space-y-4">
           {filteredEvents.length > 0 ? (
             filteredEvents.map((event) => {
@@ -113,9 +112,8 @@ export default function EventsPage() {
               return (
                 <Link
                   key={event.id}
-                  id={`event-${event.id}`}
                   href={`/events/${event.id}`}
-                  className="block bg-white p-5 rounded-xl border shadow-sm hover:border-purple-500 transition group"
+                  className="block bg-white p-5 rounded-xl border shadow-sm hover:border-purple-500 transition group cursor-pointer"
                 >
                   <div className="flex items-start gap-4">
                     <div className="flex flex-col items-center justify-center bg-purple-50 text-purple-700 border border-purple-100 rounded-lg p-3 min-w-[70px]">
