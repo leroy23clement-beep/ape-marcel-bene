@@ -13,6 +13,7 @@ export default function NewEventPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   // Champs du formulaire
   const [title, setTitle] = useState('')
@@ -37,7 +38,6 @@ export default function NewEventPage() {
         .single()
 
       if (!profileData || profileData.role !== 'admin') {
-        // Rediriger si l'utilisateur n'est pas admin
         router.push('/events')
       } else {
         setProfile(profileData)
@@ -45,6 +45,39 @@ export default function NewEventPage() {
     }
     checkUserAndAdmin()
   }, [router])
+
+  // Fonction pour gérer l'upload du fichier image vers Supabase Storage
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    try {
+      setUploading(true)
+      const file = e.target.files?.[0]
+      if (!file) return
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      // Upload dans le bucket Supabase 'events'
+      const { error: uploadError } = await supabase.storage
+        .from('events')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      // Récupération de l'URL publique de l'image
+      const { data } = supabase.storage
+        .from('events')
+        .getPublicUrl(filePath)
+
+      setImageUrl(data.publicUrl)
+    } catch (error: any) {
+      alert("Erreur lors de l'upload de l'image : " + error.message)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -80,7 +113,6 @@ export default function NewEventPage() {
       )}
 
       <main className="mx-auto max-w-2xl p-6 space-y-6">
-        {/* Lien retour */}
         <div>
           <Link href="/events" className="text-xs font-semibold text-purple-700 hover:underline">
             « Retour aux événements
@@ -125,16 +157,22 @@ export default function NewEventPage() {
               />
             </div>
 
+            {/* Sélecteur de fichier pour l'affiche */}
             <div>
-              <label className="block font-medium text-gray-700 mb-1">URL de l'affiche (Image)</label>
+              <label className="block font-medium text-gray-700 mb-1">Affiche de l'événement (Image)</label>
               <input 
-                type="url" 
-                value={imageUrl} 
-                onChange={(e) => setImageUrl(e.target.value)} 
-                placeholder="https://exemple.com/mon-affiche.jpg"
-                className="w-full p-2.5 border rounded-lg text-gray-900 text-sm"
+                type="file" 
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="w-full p-2 border rounded-lg text-gray-700 text-xs bg-gray-50 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
               />
-              <p className="text-[11px] text-gray-500 mt-1">Lien direct vers l'image de l'affiche (optionnel).</p>
+              {uploading && <p className="text-[11px] text-purple-600 mt-1">Téléchargement de l'image en cours...</p>}
+              {imageUrl && !uploading && (
+                <div className="mt-2 flex items-center gap-3">
+                  <span className="text-green-600 font-medium text-[11px]">✓ Image chargée avec succès</span>
+                  <img src={imageUrl} alt="Aperçu" className="h-16 w-auto rounded border object-contain" />
+                </div>
+              )}
             </div>
 
             <div>
@@ -157,8 +195,8 @@ export default function NewEventPage() {
               </Link>
               <button
                 type="submit"
-                disabled={loading}
-                className="px-5 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition font-semibold cursor-pointer"
+                disabled={loading || uploading}
+                className="px-5 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition font-semibold cursor-pointer disabled:opacity-50"
               >
                 {loading ? 'Création en cours...' : 'Publier l\'événement'}
               </button>
