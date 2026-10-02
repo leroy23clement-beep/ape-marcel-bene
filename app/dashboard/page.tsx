@@ -30,13 +30,16 @@ export default async function DashboardPage() {
     .select("*")
     .eq("household_id", profile?.household_id ?? "");
 
-  // Récupération des prochains événements à venir
+  // Récupération des prochains événements à venir (pour afficher les dates dans les comptes à rebours)
   const { data: upcomingEvents } = await supabase
     .from("events")
     .select("*")
     .gte("event_date", new Date().toISOString())
     .order("event_date", { ascending: true })
     .limit(3);
+
+  // Prochain événement APE spécifique pour le bloc de compte à rebours
+  const nextApeEvent = upcomingEvents && upcomingEvents.length > 0 ? upcomingEvents[0] : null;
 
   // Récupération des ventes en cours (table products)
   const { data: products } = await supabase
@@ -65,6 +68,17 @@ export default async function DashboardPage() {
     .reduce((acc, t) => acc + Number(t.amount), 0) ?? 0;
 
   const soldeGlobal = totalRecettes - totalDepenses;
+
+  // Fonction utilitaire pour formater joliment la date en français
+  const formatDateFr = (dateString: string) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -98,16 +112,43 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* Comptes à rebours placés juste en dessous */}
+        {/* Comptes à rebours avec ajout explicite des dates */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <HolidayCountdown />
-          <ApeEventCountdown />
+          
+          {/* Bloc 1 : Prochain rendez-vous (Vacances / Général) */}
+          <div className="bg-purple-900 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <span className="text-xs uppercase font-bold tracking-wider text-purple-300">Prochain rendez-vous</span>
+              <h3 className="text-lg font-extrabold mt-1">Vacances de la Toussaint 🎃</h3>
+              <p className="text-xs text-purple-200 mt-0.5 capitalize">
+                📅 Du samedi 18 octobre au lundi 3 novembre 2026
+              </p>
+            </div>
+            <HolidayCountdown />
+          </div>
+
+          {/* Bloc 2 : Prochain événement APE dynamique */}
+          <div className="bg-emerald-800 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <span className="text-xs uppercase font-bold tracking-wider text-emerald-200">Prochain événement APE</span>
+              <h3 className="text-lg font-extrabold mt-1">
+                {nextApeEvent ? nextApeEvent.title : "Aucun événement prévu"}
+              </h3>
+              {nextApeEvent && (
+                <p className="text-xs text-emerald-100 mt-0.5 capitalize">
+                  📅 {formatDateFr(nextApeEvent.event_date)} {nextApeEvent.location ? `• 📍 ${nextApeEvent.location}` : ""}
+                </p>
+              )}
+            </div>
+            <ApeEventCountdown />
+          </div>
+
         </div>
 
         {/* 1. Indicateurs Financiers dynamiques */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           
-          {/* Solde Net Global cliquable vers la trésorerie détaillée (réservé bureau ou redirection globale) */}
+          {/* Solde Net Global cliquable vers la trésorerie détaillée */}
           <Link 
             href="/bureau/tresorerie"
             className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between hover:border-purple-500 transition cursor-pointer group"
