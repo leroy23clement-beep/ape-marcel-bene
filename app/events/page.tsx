@@ -57,9 +57,21 @@ export default function EventsPage() {
 
       <main className="mx-auto max-w-5xl p-6 space-y-6">
         
-        {/* Barre d'en-tête avec les boutons de bascule */}
+        {/* Barre d'en-tête avec les boutons de bascule et d'ajout admin */}
         <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl border shadow-sm gap-4">
-          <h1 className="text-xl font-bold text-gray-900">Événements de l'APE</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold text-gray-900">Événements de l'APE</h1>
+            
+            {/* Bouton d'ajout visible uniquement pour les administrateurs */}
+            {profile?.role === 'admin' && (
+              <Link
+                href="/admin/events/new" // Modifie cette route selon ton arborescence de création
+                className="bg-purple-700 hover:bg-purple-800 text-white font-semibold px-3 py-1.5 rounded-lg shadow transition text-xs flex items-center gap-1.5"
+              >
+                + Ajouter un événement
+              </Link>
+            )}
+          </div>
 
           <div className="flex items-center gap-3">
             {viewMode === 'month' && (
