@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client'; // Utilisation du client standard
+import { createClient } from '@/lib/supabase/client';
 
 interface Transaction {
   id: string;
@@ -14,9 +14,15 @@ interface Transaction {
   date: string;
 }
 
+interface EventItem {
+  id: string;
+  title: string;
+}
+
 export default function TreasuryManagement() {
   const supabase = createClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [eventsList, setEventsList] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   
   // États du formulaire
@@ -28,23 +34,39 @@ export default function TreasuryManagement() {
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchTransactions = async () => {
+  // Charger les transactions et la liste des événements
+  const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // 1. Récupération des transactions
+    const { data: txData, error: txError } = await supabase
       .from('transactions')
       .select('*')
       .order('date', { ascending: false });
 
-    if (error) {
-      console.error('Erreur chargement transactions:', error);
+    if (txError) {
+      console.error('Erreur chargement transactions:', txError);
     } else {
-      setTransactions(data || []);
+      setTransactions(txData || []);
     }
+
+    // 2. Récupération des événements pour le menu déroulant
+    const { data: evData, error: evError } = await supabase
+      .from('events')
+      .select('id, title')
+      .order('event_date', { ascending: false });
+
+    if (evError) {
+      console.error('Erreur chargement événements:', evError);
+    } else {
+      setEventsList(evData || []);
+    }
+
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchTransactions();
+    fetchData();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,7 +114,7 @@ export default function TreasuryManagement() {
       setCategory('');
       setEventName('');
       setFile(null);
-      fetchTransactions();
+      fetchData();
     } catch (error) {
       console.error('Erreur lors de l’ajout :', error);
       alert('Une erreur est survenue lors de l’enregistrement.');
@@ -194,15 +216,21 @@ export default function TreasuryManagement() {
             />
           </div>
 
+          {/* Menu déroulant des événements */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">Événement associé (Optionnel)</label>
-            <input
-              type="text"
+            <label className="block text-sm font-medium text-gray-700">Événement associé</label>
+            <select
               value={eventName}
               onChange={(e) => setEventName(e.target.value)}
-              placeholder="ex: Fête des Enfants 2026"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900"
-            />
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border text-gray-900 bg-white"
+            >
+              <option value="Général">-- Aucun / Général --</option>
+              {eventsList.map((ev) => (
+                <option key={ev.id} value={ev.title}>
+                  {ev.title}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
