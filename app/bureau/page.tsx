@@ -63,6 +63,21 @@ export default function BureauPage() {
 
             {/* Grille des outils du bureau */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Carte Gestion de la Trésorerie */}
+              <Link 
+                href="/bureau/tresorerie"
+                className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-gray-800 group-hover:text-purple-700 transition">💰 Gestion de la Trésorerie</h3>
+                  <span className="text-xs text-purple-700 font-medium">Accéder →</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Saisie des recettes, des dépenses, bilans par événement et ajout des justificatifs (photos/PDF).
+                </p>
+              </Link>
+
               {/* Carte Suivi des tâches */}
               <Link 
                 href="/bureau/taches"
@@ -118,6 +133,7 @@ export default function BureauPage() {
                   Ajouter ou modifier les membres de l'équipe affichés publiquement.
                 </p>
               </Link>
+
             </div>
           </div>
         ) : (
