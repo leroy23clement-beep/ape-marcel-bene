@@ -50,18 +50,21 @@ export default async function DashboardPage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  // Récupération des statistiques financières de l'association depuis Supabase
-  const { data: stats } = await supabase
-    .from("association_stats")
-    .select("*")
-    .single();
+  // Récupération de toutes les transactions financières réelles
+  const { data: transactions } = await supabase
+    .from("transactions")
+    .select("type, amount");
 
-  // Calcul du bénéfice historique (Fête des enfants : 5206.50 € de recettes - 2104.94 € de dépenses)
-  const feteEnfantsProfit = 5206.50 - 2104.94; // 3101.56 €
-  
-  // Total global des bénéfices (on additionne la base de données s'il y a d'autres événements + l'événement historique)
-  const dbProfits = stats?.total_profits ?? 0;
-  const totalProfits = dbProfits + feteEnfantsProfit;
+  // Calculs dynamiques basés sur la table transactions
+  const totalRecettes = transactions
+    ?.filter((t) => t.type === 'recette')
+    .reduce((acc, t) => acc + Number(t.amount), 0) ?? 0;
+
+  const totalDepenses = transactions
+    ?.filter((t) => t.type === 'depense')
+    .reduce((acc, t) => acc + Number(t.amount), 0) ?? 0;
+
+  const soldeGlobal = totalRecettes - totalDepenses;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -101,20 +104,20 @@ export default async function DashboardPage() {
           <ApeEventCountdown />
         </div>
 
-        {/* 1. Indicateurs Financiers */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 1. Indicateurs Financiers dynamiques */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           
-          {/* Bloc Bénéfices Cliquable redirigeant vers /finance pour tous */}
+          {/* Solde Net Global cliquable vers la trésorerie détaillée (réservé bureau ou redirection globale) */}
           <Link 
-            href="/finance"
+            href="/bureau/tresorerie"
             className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between hover:border-purple-500 transition cursor-pointer group"
           >
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider group-hover:text-purple-700 transition">
-                Bénéfices Manifestations (Année) ↗
+                Solde Net Global ↗
               </p>
-              <p className="text-2xl font-bold text-purple-700 mt-1">
-                {totalProfits.toFixed(2)} €
+              <p className={`text-2xl font-bold mt-1 ${soldeGlobal >= 0 ? 'text-purple-700' : 'text-orange-600'}`}>
+                {soldeGlobal.toFixed(2)} €
               </p>
             </div>
             <div className="p-3 bg-purple-50 text-purple-700 rounded-full text-lg">
@@ -122,17 +125,33 @@ export default async function DashboardPage() {
             </div>
           </Link>
 
+          {/* Total Recettes */}
           <div className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Dépensé pour les écoles
+                Total Recettes
               </p>
-              <p className="text-2xl font-bold text-blue-600 mt-1">
-                {stats?.total_school_expenses ? `${stats.total_school_expenses} €` : "0 €"}
+              <p className="text-2xl font-bold text-green-600 mt-1">
+                {totalRecettes.toFixed(2)} €
               </p>
             </div>
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-full text-lg">
-              🏫
+            <div className="p-3 bg-green-50 text-green-600 rounded-full text-lg">
+              📈
+            </div>
+          </div>
+
+          {/* Total Dépenses */}
+          <div className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total Dépenses
+              </p>
+              <p className="text-2xl font-bold text-red-600 mt-1">
+                {totalDepenses.toFixed(2)} €
+              </p>
+            </div>
+            <div className="p-3 bg-red-50 text-red-600 rounded-full text-lg">
+              📉
             </div>
           </div>
         </div>
