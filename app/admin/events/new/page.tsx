@@ -46,7 +46,7 @@ export default function NewEventPage() {
     checkUserAndAdmin()
   }, [router])
 
-  // Fonction pour gérer l'upload du fichier image vers Supabase Storage
+  // Fonction pour gérer l'upload du fichier image vers le bucket 'events-images'
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploading(true)
@@ -57,9 +57,9 @@ export default function NewEventPage() {
       const fileName = `${Date.now()}.${fileExt}`
       const filePath = `${fileName}`
 
-      // Upload dans le bucket Supabase 'events'
+      // Upload dans le bucket Supabase 'events-images'
       const { error: uploadError } = await supabase.storage
-        .from('events')
+        .from('events-images')
         .upload(filePath, file)
 
       if (uploadError) {
@@ -68,7 +68,7 @@ export default function NewEventPage() {
 
       // Récupération de l'URL publique de l'image
       const { data } = supabase.storage
-        .from('events')
+        .from('events-images')
         .getPublicUrl(filePath)
 
       setImageUrl(data.publicUrl)
@@ -157,7 +157,7 @@ export default function NewEventPage() {
               />
             </div>
 
-            {/* Sélecteur de fichier pour l'affiche */}
+            {/* Sélecteur de fichier pointant vers events-images */}
             <div>
               <label className="block font-medium text-gray-700 mb-1">Affiche de l'événement (Image)</label>
               <input 
