@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 
 export default function EventsPage() {
   const supabase = createClient()
-  const router = useRouter()
   
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -104,7 +102,7 @@ export default function EventsPage() {
           </div>
         </div>
 
-        {/* Liste des événements avec redirection par clic direct */}
+        {/* Liste des événements avec balise <a> native */}
         <div className="space-y-4">
           {filteredEvents.length > 0 ? (
             filteredEvents.map((event) => {
@@ -113,10 +111,10 @@ export default function EventsPage() {
               const timeString = eventDateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
               return (
-                <div
+                <a
                   key={event.id}
-                  onClick={() => router.push(`/events/${event.id}`)}
-                  className="bg-white p-5 rounded-xl border shadow-sm hover:border-purple-500 hover:shadow-md transition cursor-pointer group"
+                  href={`/events/${event.id}`}
+                  className="block bg-white p-5 rounded-xl border shadow-sm hover:border-purple-500 hover:shadow-md transition cursor-pointer group"
                 >
                   <div className="flex items-start gap-4">
                     <div className="flex flex-col items-center justify-center bg-purple-50 text-purple-700 border border-purple-100 rounded-lg p-3 min-w-[70px]">
@@ -139,7 +137,7 @@ export default function EventsPage() {
                       )}
                     </div>
                   </div>
-                </div>
+                </a>
               )
             })
           ) : (
