@@ -28,6 +28,19 @@ export default function SendNotificationForm() {
       <h3 className="font-bold text-base text-gray-900">Envoyer une notification push</h3>
       
       <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-700">Destinataires</label>
+        <select 
+          name="target" 
+          required
+          className="w-full p-2 border rounded-md text-sm text-gray-900 bg-white"
+        >
+          <option value="all">Tout le monde (Tous les parents abonnés)</option>
+          <option value="bureau">Membres du Bureau (Admin, Président, Bureau, etc.)</option>
+          <option value="restricted">Restreint (Trésorier, Secrétaire & Toi)</option>
+        </select>
+      </div>
+
+      <div className="space-y-1">
         <label className="text-xs font-medium text-gray-700">Titre de l'alerte</label>
         <input
           type="text"
@@ -54,7 +67,7 @@ export default function SendNotificationForm() {
         disabled={loading}
         className="w-full bg-purple-700 text-white text-sm font-semibold py-2 rounded-lg hover:bg-purple-800 transition cursor-pointer disabled:opacity-50"
       >
-        {loading ? "Envoi en cours..." : "Diffuser la notification à tout le monde 🚀"}
+        {loading ? "Envoi en cours..." : "Diffuser la notification 🚀"}
       </button>
 
       {feedback && (

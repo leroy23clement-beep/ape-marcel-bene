@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import EnableNotificationsButton from '@/components/EnableNotificationsButton'
 
 export default function Navbar({ userEmail, firstName, role }: { userEmail: string; firstName?: string; role?: string }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -68,8 +69,11 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
             })}
           </div>
 
-          {/* Profil, Rôle & Déconnexion Desktop */}
+          {/* Profil, Rôle, Bouton Notifications & Déconnexion Desktop */}
           <div className="hidden md:flex items-center space-x-3">
+            {/* Bouton d'activation push (disparaît une fois activé) */}
+            <EnableNotificationsButton />
+
             <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
               <span className="text-xs text-gray-700 font-medium">
                 Bonjour, <strong className="text-gray-900">{displayName}</strong>
@@ -102,7 +106,12 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
 
       {/* Menu Mobile Déroulant */}
       {isOpen && (
-        <div className="md:hidden bg-white border-b px-4 pt-2 pb-4 space-y-2 shadow-lg">
+        <div className="md:hidden bg-white border-b px-4 pt-2 pb-4 space-y-3 shadow-lg">
+          {/* Bouton d'activation push en haut du menu mobile */}
+          <div className="pb-2 border-b">
+            <EnableNotificationsButton />
+          </div>
+
           <div className="flex items-center justify-between text-xs text-gray-500 pb-2 border-b">
             <span>Connecté : <strong className="text-gray-800">{displayName}</strong></span>
             {role && role !== 'parent' && (
