@@ -15,6 +15,16 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     window.location.href = '/login'
   }
 
+  // Fonction pour déterminer le nom affiché selon le rôle
+  const getDisplayName = () => {
+    if (role === 'admin') return 'Patron'
+    if (role === 'tresorier') return 'Picsou'
+    if (role === 'secretaire') return 'Biquette'
+    return firstName || userEmail
+  }
+
+  const displayName = getDisplayName()
+
   // Tous les rôles qui ont accès à l'Espace Bureau
   const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
   const isBureau = role ? allowedBureauRoles.includes(role.toLowerCase()) : false
@@ -62,7 +72,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
           <div className="hidden md:flex items-center space-x-3">
             <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
               <span className="text-xs text-gray-700 font-medium">
-                {firstName ? `Bonjour, ${firstName}` : userEmail}
+                Bonjour, <strong className="text-gray-900">{displayName}</strong>
               </span>
               {role && role !== 'parent' && (
                 <span className="text-[10px] font-bold uppercase bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
@@ -94,7 +104,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
       {isOpen && (
         <div className="md:hidden bg-white border-b px-4 pt-2 pb-4 space-y-2 shadow-lg">
           <div className="flex items-center justify-between text-xs text-gray-500 pb-2 border-b">
-            <span>Connecté : <strong className="text-gray-800">{firstName || userEmail}</strong></span>
+            <span>Connecté : <strong className="text-gray-800">{displayName}</strong></span>
             {role && role !== 'parent' && (
               <span className="text-[10px] font-bold uppercase bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
                 {role}
