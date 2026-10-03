@@ -6,8 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 export default function TreasuryManagement() {
   const supabase = createClient()
   
-  // États du formulaire d'ajout de transaction
-  const [type, setType] = useState('expense') // 'income' (Recette) ou 'expense' (Dépense)
+  // États du formulaire d'ajout de transaction (mis en conformité avec la contrainte de la base)
+  const [type, setType] = useState('Dépense (Sortie)') 
   const [amount, setAmount] = useState('')
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('')
@@ -146,8 +146,8 @@ export default function TreasuryManagement() {
                 onChange={(e) => setType(e.target.value)}
                 className="w-full p-2.5 border rounded-lg text-gray-900 text-sm bg-white"
               >
-                <option value="expense">Dépense (Sortie)</option>
-                <option value="income">Recette (Entrée)</option>
+                <option value="Dépense (Sortie)">Dépense (Sortie)</option>
+                <option value="Recette (Entrée)">Recette (Entrée)</option>
               </select>
             </div>
 
