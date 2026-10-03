@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
+import SendNotificationForm from '@/components/SendNotificationForm'
 
 export default function BureauPage() {
   const supabase = createClient()
@@ -39,6 +40,10 @@ export default function BureauPage() {
   const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
   const userRole = profile?.role ? profile.role.toLowerCase() : 'parent'
   const isBureau = allowedBureauRoles.includes(userRole)
+
+  // Rôles stricts autorisés à envoyer des notifications push (ex: admin, tresorier, secretaire)
+  const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
+  const canSendNotifications = notificationAllowedRoles.includes(userRole)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -135,6 +140,24 @@ export default function BureauPage() {
               </Link>
 
             </div>
+
+            {/* Section Notifications Push (Réservée Admin, Trésorier, Secrétaire) */}
+            {canSendNotifications ? (
+              <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4 pt-6 mt-6 border-t">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-800">🚀 Diffusion de notifications push</h2>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Envoyez une alerte instantanée sur les téléphones des parents abonnés.
+                  </p>
+                </div>
+                <SendNotificationForm />
+              </div>
+            ) : (
+              <div className="bg-gray-50 border rounded-xl p-4 text-xs text-gray-500 italic">
+                * Le module d'envoi de notifications push est réservé au bureau restreint (Admin, Trésorier, Secrétaire).
+              </div>
+            )}
+
           </div>
         ) : (
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700 text-sm">

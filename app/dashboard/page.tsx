@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import HolidayCountdown from "@/components/HolidayCountdown";
 import ApeEventCountdown from "@/components/ApeEventCountdown";
+import PushNotificationButton from "@/components/PushNotificationButton";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -111,6 +112,9 @@ export default async function DashboardPage() {
             Découvrir l'association →
           </Link>
         </div>
+
+        {/* Bouton d'activation des notifications mobiles */}
+        <PushNotificationButton />
 
         {/* Comptes à rebours avec ajout explicite des dates */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
