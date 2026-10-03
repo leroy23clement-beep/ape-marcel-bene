@@ -11,7 +11,7 @@ export default function TreasuryManagement() {
   const [amount, setAmount] = useState('')
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('')
-  const [eventId, setEventId] = useState('')
+  const [eventName, setEventName] = useState('')
   
   const [eventsList, setEventsList] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
@@ -36,7 +36,7 @@ export default function TreasuryManagement() {
     setLoading(true)
     const { data, error } = await supabase
       .from('transactions')
-      .select('*, events(title)')
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -64,14 +64,14 @@ export default function TreasuryManagement() {
     e.preventDefault()
     setSubmitting(true)
 
-    // Insertion avec libellé et catégorie optionnels (envoyés en null si vides)
+    // Insertion avec libellé, catégorie et event_name optionnels (envoyés en null si vides)
     const { error } = await supabase.from('transactions').insert([
       {
         type,
         amount: parseFloat(amount),
         title: title.trim() ? title.trim() : null,
         category: category.trim() ? category.trim() : null,
-        event_id: eventId ? eventId : null,
+        event_name: eventName ? eventName : null,
       },
     ])
 
@@ -84,7 +84,7 @@ export default function TreasuryManagement() {
       setAmount('')
       setTitle('')
       setCategory('')
-      setEventId('')
+      setEventName('')
       // Rechargement des données
       fetchTransactions()
     }
@@ -189,13 +189,13 @@ export default function TreasuryManagement() {
             <div className="md:col-span-2">
               <label className="block font-medium text-gray-700 mb-1">Événement associé (optionnel)</label>
               <select 
-                value={eventId} 
-                onChange={(e) => setEventId(e.target.value)}
+                value={eventName} 
+                onChange={(e) => setEventName(e.target.value)}
                 className="w-full p-2.5 border rounded-lg text-gray-900 text-sm bg-white"
               >
                 <option value="">-- Aucun / Général --</option>
                 {eventsList.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
+                  <option key={ev.id} value={ev.title}>
                     {ev.title}
                   </option>
                 ))}
@@ -253,7 +253,7 @@ export default function TreasuryManagement() {
                         <div className="text-xs text-gray-500">{t.category || 'Aucune catégorie'}</div>
                       </td>
                       <td className="p-4 text-xs text-gray-600">
-                        {t.events?.title || 'Général'}
+                        {t.event_name || 'Général'}
                       </td>
                       <td className={`p-4 text-right font-bold text-base ${isIncome ? 'text-emerald-600' : 'text-red-600'}`}>
                         {isIncome ? '+' : '-'}{Number(t.amount).toFixed(2)} €
