@@ -6,8 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 export default function TreasuryManagement() {
   const supabase = createClient()
   
-  // États du formulaire d'ajout de transaction (mis en conformité avec la contrainte de la base)
-  const [type, setType] = useState('Dépense (Sortie)') 
+  const [type, setType] = useState('Dépense') 
   const [amount, setAmount] = useState('')
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('')
@@ -18,7 +17,6 @@ export default function TreasuryManagement() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  // Totaux globaux
   const [totalIncome, setTotalIncome] = useState(0)
   const [totalExpense, setTotalExpense] = useState(0)
 
@@ -37,18 +35,17 @@ export default function TreasuryManagement() {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false }) // Tri par ID pour éviter les soucis de nommage de date
 
     if (error) {
       console.error("Erreur chargement transactions", error)
     } else if (data) {
       setTransactions(data)
       
-      // Calcul des totaux
       let income = 0
       let expense = 0
       data.forEach(t => {
-        if (t.type === 'income' || t.type === 'Recette (Entrée)') {
+        if (t.type === 'Recette') {
           income += Number(t.amount) || 0
         } else {
           expense += Number(t.amount) || 0
@@ -64,7 +61,6 @@ export default function TreasuryManagement() {
     e.preventDefault()
     setSubmitting(true)
 
-    // Insertion avec libellé, catégorie et event_name optionnels (envoyés en null si vides)
     const { error } = await supabase.from('transactions').insert([
       {
         type,
@@ -80,12 +76,10 @@ export default function TreasuryManagement() {
     if (error) {
       alert("Erreur lors de l'enregistrement : " + error.message)
     } else {
-      // Réinitialisation du formulaire
       setAmount('')
       setTitle('')
       setCategory('')
       setEventName('')
-      // Rechargement des données
       fetchTransactions()
     }
   }
@@ -146,8 +140,8 @@ export default function TreasuryManagement() {
                 onChange={(e) => setType(e.target.value)}
                 className="w-full p-2.5 border rounded-lg text-gray-900 text-sm bg-white"
               >
-                <option value="Dépense (Sortie)">Dépense (Sortie)</option>
-                <option value="Recette (Entrée)">Recette (Entrée)</option>
+                <option value="Dépense">Dépense (Sortie)</option>
+                <option value="Recette">Recette (Entrée)</option>
               </select>
             </div>
 
@@ -237,15 +231,15 @@ export default function TreasuryManagement() {
               </thead>
               <tbody className="divide-y">
                 {transactions.map((t) => {
-                  const isIncome = t.type === 'income' || t.type === 'Recette (Entrée)'
+                  const isIncome = t.type === 'Recette'
                   return (
                     <tr key={t.id} className="hover:bg-gray-50/50 transition">
                       <td className="p-4 text-xs text-gray-500">
-                        {new Date(t.created_at).toLocaleDateString('fr-FR')}
+                        {t.created_at ? new Date(t.created_at).toLocaleDateString('fr-FR') : '-'}
                       </td>
                       <td className="p-4">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${isIncome ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                          {isIncome ? 'Recette' : 'Dépense'}
+                          {t.type}
                         </span>
                       </td>
                       <td className="p-4">
