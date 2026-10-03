@@ -58,13 +58,13 @@ export default async function DashboardPage() {
     .from("transactions")
     .select("type, amount");
 
-  // Calculs dynamiques basés sur la table transactions
+  // Calculs dynamiques basés sur la table transactions (en prenant en compte toutes les variantes de casse et libellés)
   const totalRecettes = transactions
-    ?.filter((t) => t.type === 'recette')
+    ?.filter((t) => t.type === 'Recette' || t.type === 'recette' || t.type === 'income' || t.type === 'Recette (Entrée)')
     .reduce((acc, t) => acc + Number(t.amount), 0) ?? 0;
 
   const totalDepenses = transactions
-    ?.filter((t) => t.type === 'depense')
+    ?.filter((t) => t.type === 'Dépense' || t.type === 'depense' || t.type === 'expense' || t.type === 'Dépense (Sortie)')
     .reduce((acc, t) => acc + Number(t.amount), 0) ?? 0;
 
   const soldeGlobal = totalRecettes - totalDepenses;
