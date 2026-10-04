@@ -1,42 +1,111 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+'use client'
+
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import { addSchoolNotice, updateNotice, deleteNotice } from "./actions";
 
-export default async function EcolePage() {
-  const supabase = await createClient();
+export default function EcolePage() {
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [schoolNotices, setSchoolNotices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Formulaire d'ajout
+  const [newTitle, setNewTitle] = useState("");
+  const [newCategory, setNewCategory] = useState("info");
+  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newContent, setNewContent] = useState("");
 
-  if (!user) {
-    redirect("/login");
+  // Édition en cours (par ID)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editCategory, setEditCategory] = useState("info");
+  const [editDate, setEditDate] = useState("");
+  const [editContent, setEditContent] = useState("");
+
+  const supabase = createClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      setUser(user);
+
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      setProfile(prof);
+
+      fetchNotices();
+    }
+    loadData();
+  }, []);
+
+  async function fetchNotices() {
+    const { data } = await supabase
+      .from("school_notices")
+      .select("*")
+      .order("notice_date", { ascending: false });
+    setSchoolNotices(data || []);
+    setLoading(false);
   }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
 
   const isAdminOrBureau = profile?.role && profile.role !== 'parent';
 
-  // Récupération de toutes les données de school_notices
-  const { data: schoolNotices } = await supabase
-    .from("school_notices")
-    .select("*")
-    .order("notice_date", { ascending: false });
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTitle) return;
 
-  // Tri par catégorie
-  const eventsList = schoolNotices?.filter((notice) => notice.category === 'trip') || [];
-  const linksList = schoolNotices?.filter((notice) => notice.category === 'link') || [];
-  const generalInfosList = schoolNotices?.filter((notice) => notice.category !== 'trip' && notice.category !== 'link') || [];
+    await supabase.from("school_notices").insert({
+      title: newTitle,
+      content: newContent || '',
+      category: newCategory || 'info',
+      notice_date: newDate || new Date().toISOString()
+    });
+
+    setNewTitle("");
+    setNewContent("");
+    fetchNotices();
+  }
+
+  async function handleUpdate(id: string, e: React.FormEvent) {
+    e.preventDefault();
+    await supabase.from("school_notices").update({
+      title: editTitle,
+      content: editContent || '',
+      category: editCategory || 'info',
+      notice_date: editDate || new Date().toISOString()
+    }).eq('id', id);
+
+    setEditingId(null);
+    fetchNotices();
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Voulez-vous supprimer cet élément ?")) return;
+    await supabase.from("school_notices").delete().eq('id', id);
+    fetchNotices();
+  }
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-500">Chargement...</div>;
+  }
+
+  const eventsList = schoolNotices.filter((notice) => notice.category === 'trip');
+  const linksList = schoolNotices.filter((notice) => notice.category === 'link');
+  const generalInfosList = schoolNotices.filter((notice) => notice.category !== 'trip' && notice.category !== 'link');
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       <Navbar 
-        userEmail={user.email} 
+        userEmail={user?.email} 
         firstName={profile?.first_name} 
         role={profile?.role} 
       />
@@ -84,19 +153,15 @@ export default async function EcolePage() {
 
                       {isAdminOrBureau && (
                         <div className="pt-2 border-t border-black/10 space-y-2 text-xs">
-                          <details className="group">
-                            <summary className="cursor-pointer text-purple-700 font-semibold hover:underline inline-flex items-center gap-1">
-                              ✏️ Modifier
-                            </summary>
-                            <form action={updateNotice} className="mt-3 p-3 bg-purple-50/80 border border-purple-200 rounded-lg space-y-2.5">
-                              <input type="hidden" name="id" value={notice.id} />
+                          {editingId === notice.id ? (
+                            <form onSubmit={(e) => handleUpdate(notice.id, e)} className="p-3 bg-purple-50/80 border border-purple-200 rounded-lg space-y-2.5">
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Titre</label>
-                                <input type="text" name="title" defaultValue={notice.title} required className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                                <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
                               </div>
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Catégorie</label>
-                                <select name="category" defaultValue={notice.category} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900">
+                                <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900">
                                   <option value="info">Information générale</option>
                                   <option value="photo">Photo / Souvenir</option>
                                   <option value="trip">Événement / Sortie / Voyage</option>
@@ -105,27 +170,33 @@ export default async function EcolePage() {
                               </div>
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Date</label>
-                                <input type="date" name="notice_date" defaultValue={notice.notice_date ? notice.notice_date.split('T')[0] : ''} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                                <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
                               </div>
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Contenu</label>
-                                <textarea name="content" rows={2} defaultValue={notice.content} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                                <textarea rows={2} value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
                               </div>
                               <div className="flex justify-end gap-2 pt-1">
-                                <button type="submit" className="bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-purple-800 transition cursor-pointer">
-                                  Mettre à jour
-                                </button>
+                                <button type="button" onClick={() => setEditingId(null)} className="px-3 py-1.5 rounded text-xs bg-gray-200 text-gray-700">Annuler</button>
+                                <button type="submit" className="bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-purple-800">Enregistrer</button>
                               </div>
                             </form>
-                          </details>
-                          <div className="flex justify-end pt-1 border-t border-black/5">
-                            <form action={deleteNotice} onSubmit={(e) => { if(!confirm("Voulez-vous supprimer cet élément ?")) e.preventDefault(); }}>
-                              <input type="hidden" name="id" value={notice.id} />
-                              <button type="submit" className="text-red-600 hover:underline font-semibold cursor-pointer">
+                          ) : (
+                            <div className="flex justify-between items-center pt-1">
+                              <button onClick={() => {
+                                setEditingId(notice.id);
+                                setEditTitle(notice.title);
+                                setEditCategory(notice.category);
+                                setEditDate(notice.notice_date ? notice.notice_date.split('T')[0] : '');
+                                setEditContent(notice.content);
+                              }} className="text-purple-700 font-semibold hover:underline">
+                                ✏️ Modifier
+                              </button>
+                              <button onClick={() => handleDelete(notice.id)} className="text-red-600 hover:underline font-semibold">
                                 🗑 Supprimer
                               </button>
-                            </form>
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -167,19 +238,15 @@ export default async function EcolePage() {
 
                       {isAdminOrBureau && (
                         <div className="pt-2 border-t border-black/10 space-y-2 text-xs">
-                          <details className="group">
-                            <summary className="cursor-pointer text-purple-700 font-semibold hover:underline inline-flex items-center gap-1">
-                              ✏️ Modifier
-                            </summary>
-                            <form action={updateNotice} className="mt-3 p-3 bg-purple-50/80 border border-purple-200 rounded-lg space-y-2.5">
-                              <input type="hidden" name="id" value={notice.id} />
+                          {editingId === notice.id ? (
+                            <form onSubmit={(e) => handleUpdate(notice.id, e)} className="p-3 bg-purple-50/80 border border-purple-200 rounded-lg space-y-2.5">
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Titre</label>
-                                <input type="text" name="title" defaultValue={notice.title} required className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                                <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
                               </div>
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Catégorie</label>
-                                <select name="category" defaultValue={notice.category} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900">
+                                <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900">
                                   <option value="info">Information générale</option>
                                   <option value="photo">Photo / Souvenir</option>
                                   <option value="trip">Événement / Sortie / Voyage</option>
@@ -188,27 +255,33 @@ export default async function EcolePage() {
                               </div>
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Date</label>
-                                <input type="date" name="notice_date" defaultValue={notice.notice_date ? notice.notice_date.split('T')[0] : ''} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                                <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
                               </div>
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Contenu</label>
-                                <textarea name="content" rows={2} defaultValue={notice.content} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                                <textarea rows={2} value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
                               </div>
                               <div className="flex justify-end gap-2 pt-1">
-                                <button type="submit" className="bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-purple-800 transition cursor-pointer">
-                                  Mettre à jour
-                                </button>
+                                <button type="button" onClick={() => setEditingId(null)} className="px-3 py-1.5 rounded text-xs bg-gray-200 text-gray-700">Annuler</button>
+                                <button type="submit" className="bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-purple-800">Enregistrer</button>
                               </div>
                             </form>
-                          </details>
-                          <div className="flex justify-end pt-1 border-t border-black/5">
-                            <form action={deleteNotice} onSubmit={(e) => { if(!confirm("Voulez-vous supprimer cet élément ?")) e.preventDefault(); }}>
-                              <input type="hidden" name="id" value={notice.id} />
-                              <button type="submit" className="text-red-600 hover:underline font-semibold cursor-pointer">
+                          ) : (
+                            <div className="flex justify-between items-center pt-1">
+                              <button onClick={() => {
+                                setEditingId(notice.id);
+                                setEditTitle(notice.title);
+                                setEditCategory(notice.category);
+                                setEditDate(notice.notice_date ? notice.notice_date.split('T')[0] : '');
+                                setEditContent(notice.content);
+                              }} className="text-purple-700 font-semibold hover:underline">
+                                ✏️ Modifier
+                              </button>
+                              <button onClick={() => handleDelete(notice.id)} className="text-red-600 hover:underline font-semibold">
                                 🗑 Supprimer
                               </button>
-                            </form>
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -239,12 +312,9 @@ export default async function EcolePage() {
                         🔗 {link.title} ↗
                       </a>
                       {isAdminOrBureau && (
-                        <form action={deleteNotice}>
-                          <input type="hidden" name="id" value={link.id} />
-                          <button type="submit" className="text-red-500 hover:text-red-700 ml-2 font-bold cursor-pointer" title="Supprimer">
-                            ✕
-                          </button>
-                        </form>
+                        <button onClick={() => handleDelete(link.id)} className="text-red-500 hover:text-red-700 ml-2 font-bold cursor-pointer" title="Supprimer">
+                          ✕
+                        </button>
                       )}
                     </div>
                   ))
@@ -261,14 +331,14 @@ export default async function EcolePage() {
               </h3>
 
               {isAdminOrBureau ? (
-                <form action={addSchoolNotice} className="bg-white border rounded-xl p-4 shadow-sm space-y-3">
+                <form onSubmit={handleAdd} className="bg-white border rounded-xl p-4 shadow-sm space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Titre / Nom du lien</label>
-                    <input type="text" name="title" required placeholder="Ex: Portail Cantine..." className="w-full p-2 border rounded-md text-xs text-gray-900" />
+                    <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required placeholder="Ex: Portail Cantine..." className="w-full p-2 border rounded-md text-xs text-gray-900" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Type d'élément</label>
-                    <select name="category" className="w-full p-2 border rounded-md text-xs bg-white text-gray-900">
+                    <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full p-2 border rounded-md text-xs bg-white text-gray-900">
                       <option value="info">Information générale</option>
                       <option value="photo">Photo / Souvenir</option>
                       <option value="trip">Événement / Sortie / Voyage</option>
@@ -277,11 +347,11 @@ export default async function EcolePage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Date affichée</label>
-                    <input type="date" name="notice_date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border rounded-md text-xs text-gray-900" />
+                    <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="w-full p-2 border rounded-md text-xs text-gray-900" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Contenu (ou URL si lien)</label>
-                    <textarea name="content" rows={3} placeholder="Détails ou URL du lien..." className="w-full p-2 border rounded-md text-xs text-gray-900" />
+                    <textarea rows={3} value={newContent} onChange={(e) => setNewContent(e.target.value)} placeholder="Détails ou URL du lien..." className="w-full p-2 border rounded-md text-xs text-gray-900" />
                   </div>
                   <button type="submit" className="w-full bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold py-2 rounded-md transition cursor-pointer">
                     + Publier
