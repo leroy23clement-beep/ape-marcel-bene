@@ -3,6 +3,40 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Navbar from "@/components/Navbar";
 
+// --- Actions serveur déplacées à la racine du fichier ---
+
+async function addSchoolNotice(formData: FormData) {
+  'use server'
+  const supabaseServer = await createClient();
+  const title = formData.get('title') as string;
+  const content = formData.get('content') as string;
+  const category = formData.get('category') as string;
+  const notice_date = formData.get('notice_date') as string;
+
+  if (!title) return;
+
+  await supabaseServer.from("school_notices").insert({
+    title,
+    content: content || '',
+    category: category || 'info',
+    notice_date: notice_date || new Date().toISOString()
+  });
+
+  revalidatePath('/ecole');
+}
+
+async function deleteNotice(formData: FormData) {
+  'use server'
+  const supabaseServer = await createClient();
+  const id = formData.get('id') as string;
+  if (!id) return;
+
+  await supabaseServer.from("school_notices").delete().eq('id', id);
+  revalidatePath('/ecole');
+}
+
+// --- Composant de la page ---
+
 export default async function EcolePage() {
   const supabase = await createClient();
 
@@ -32,37 +66,6 @@ export default async function EcolePage() {
   const eventsList = schoolNotices?.filter((notice) => notice.category === 'trip') || [];
   const linksList = schoolNotices?.filter((notice) => notice.category === 'link') || [];
   const generalInfosList = schoolNotices?.filter((notice) => notice.category !== 'trip' && notice.category !== 'link') || [];
-
-  // Actions serveur
-  async function addSchoolNotice(formData: FormData) {
-    'use server'
-    const supabaseServer = await createClient();
-    const title = formData.get('title') as string;
-    const content = formData.get('content') as string;
-    const category = formData.get('category') as string;
-    const notice_date = formData.get('notice_date') as string;
-
-    if (!title) return;
-
-    await supabaseServer.from("school_notices").insert({
-      title,
-      content: content || '',
-      category: category || 'info',
-      notice_date: notice_date || new Date().toISOString()
-    });
-
-    revalidatePath('/ecole');
-  }
-
-  async function deleteNotice(formData: FormData) {
-    'use server'
-    const supabaseServer = await createClient();
-    const id = formData.get('id') as string;
-    if (!id) return;
-
-    await supabaseServer.from("school_notices").delete().eq('id', id);
-    revalidatePath('/ecole');
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -102,7 +105,7 @@ export default async function EcolePage() {
               <div className="space-y-3">
                 {eventsList.length > 0 ? (
                   eventsList.map((notice) => (
-                    <NoticeCard key={notice.id} notice={notice} isAdminOrBureau={isAdminOrBureau} deleteAction={deleteNotice} />
+                    <NoticeCard key={notice.id} notice={notice} isAdminOrBureau={isAdminOrBureau} />
                   ))
                 ) : (
                   <p className="text-xs text-gray-500 italic bg-white p-4 rounded-xl border">
@@ -126,7 +129,7 @@ export default async function EcolePage() {
               <div className="space-y-3">
                 {generalInfosList.length > 0 ? (
                   generalInfosList.map((notice) => (
-                    <NoticeCard key={notice.id} notice={notice} isAdminOrBureau={isAdminOrBureau} deleteAction={deleteNotice} />
+                    <NoticeCard key={notice.id} notice={notice} isAdminOrBureau={isAdminOrBureau} />
                   ))
                 ) : (
                   <p className="text-xs text-gray-500 italic bg-white p-4 rounded-xl border">
@@ -191,11 +194,11 @@ export default async function EcolePage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Date affichée (ou URL si lien)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date affichée</label>
                     <input type="date" name="notice_date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border rounded-md text-xs text-gray-900" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Contenu (ou Lien https://... si lien)</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Contenu (ou URL si lien)</label>
                     <textarea name="content" rows={3} placeholder="Détails ou URL du lien..." className="w-full p-2 border rounded-md text-xs text-gray-900" />
                   </div>
                   <button type="submit" className="w-full bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold py-2 rounded-md transition cursor-pointer">
@@ -219,7 +222,7 @@ export default async function EcolePage() {
 }
 
 // Composant carte avec bouton supprimer
-function NoticeCard({ notice, isAdminOrBureau, deleteAction }: { notice: any; isAdminOrBureau: boolean; deleteAction: any }) {
+function NoticeCard({ notice, isAdminOrBureau }: { notice: any; isAdminOrBureau: boolean }) {
   return (
     <div className={`p-4 border rounded-xl space-y-2 shadow-sm ${
       notice.category === 'photo' ? 'bg-blue-50/60 border-blue-200 text-blue-900' :
@@ -238,7 +241,7 @@ function NoticeCard({ notice, isAdminOrBureau, deleteAction }: { notice: any; is
 
       {isAdminOrBureau && (
         <div className="pt-2 border-t border-black/10 flex items-center justify-end gap-3 text-xs">
-          <form action={deleteAction} onSubmit={(e) => { if(!confirm("Voulez-vous supprimer cet élément ?")) e.preventDefault(); }}>
+          <form action={deleteNotice}>
             <input type="hidden" name="id" value={notice.id} />
             <button type="submit" className="text-red-600 hover:underline font-semibold cursor-pointer">
               🗑 Supprimer
