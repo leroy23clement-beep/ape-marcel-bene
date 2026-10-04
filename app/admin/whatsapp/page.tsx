@@ -37,85 +37,22 @@ export default function WhatsAppStatsAdminPage() {
         setProfile(profileData)
       }
 
-      // Charger les stats existantes depuis Supabase
+      // Charger les stats existantes
       const { data: existingData } = await supabase
         .from('whatsapp_stats')
         .select('*')
         .order('id', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (existingData) {
-        setStats(existingData.stats_json)
+        setStats(existingData.stats_json || existingData)
       }
     }
     checkUserAndAdmin()
   }, [router])
 
-  // Fonction de fusion de deux objets de statistiques
-  function mergeStats(oldStats: any, newStats: any) {
-    if (!oldStats) return newStats
-
-    const totalMessages = oldStats.totalMessages + newStats.totalMessages
-    const aperoCount = oldStats.aperoCount + newStats.aperoCount
-    const citeCount = oldStats.citeCount + newStats.citeCount
-    const totalEmojis = oldStats.totalEmojis + newStats.totalEmojis
-    const nightMessagesCount = oldStats.nightMessagesCount + newStats.nightMessagesCount
-    const morningMessagesCount = oldStats.morningMessagesCount + newStats.morningMessagesCount
-    const questionCount = oldStats.questionCount + newStats.questionCount
-    const shoutCount = oldStats.shoutCount + newStats.shoutCount
-
-    // Fusion des messages par utilisateur
-    const userMessageCount = { ...oldStats.userMessageCount }
-    for (const [author, count] of Object.entries(newStats.userMessageCount || {})) {
-      userMessageCount[author] = (userMessageCount[author] || 0) as number + (count as number)
-    }
-
-    // Fusion des emojis par utilisateur
-    const userEmojiCount = { ...oldStats.userEmojiCount }
-    for (const [author, count] of Object.entries(newStats.userEmojiCount || {})) {
-      userEmojiCount[author] = (userEmojiCount[author] || 0) as number + (count as number)
-    }
-
-    // Trouver le nouveau top bavard
-    let topBavard = { name: 'Personne', count: 0 }
-    for (const [author, count] of Object.entries(userMessageCount)) {
-      if ((count as number) > topBavard.count) {
-        topBavard = { name: author, count: count as number }
-      }
-    }
-
-    // Trouver le nouveau roi des emojis
-    let topEmojiUser = { name: 'Personne', count: 0 }
-    for (const [author, count] of Object.entries(userEmojiCount)) {
-      if ((count as number) > topEmojiUser.count) {
-        topEmojiUser = { name: author, count: count as number }
-      }
-    }
-
-    // Garder le message le plus long entre les deux
-    const longestMessage = (newStats.longestMessage.length > (oldStats.longestMessage?.length || 0))
-      ? newStats.longestMessage
-      : oldStats.longestMessage
-
-    return {
-      totalMessages,
-      aperoCount,
-      citeCount,
-      totalEmojis,
-      nightMessagesCount,
-      morningMessagesCount,
-      questionCount,
-      shoutCount,
-      userMessageCount,
-      userEmojiCount,
-      topBavard,
-      topEmojiUser,
-      longestMessage
-    }
-  }
-
-  // Lecture et cumul du fichier uploadé
+  // Lecture et remplacement direct par le nouveau fichier analysé
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -126,19 +63,22 @@ export default function WhatsAppStatsAdminPage() {
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string
+        
+        // Analyse complète du fichier (génère tous les chiffres et les top 3)
         const newAnalysis = parseWhatsAppExport(content)
+        setStats(newAnalysis)
 
-        // Cumuler avec les stats précédentes stockées dans l'état
-        const cumulativeStats = mergeStats(stats, newAnalysis)
-        setStats(cumulativeStats)
+        // Nettoyer la table et insérer la nouvelle analyse fraîche
+        await supabase.from('whatsapp_stats').delete().neq('id', 0)
+        const { error: insertError } = await supabase.from('whatsapp_stats').insert([{ stats_json: newAnalysis }])
 
-        // Sauvegarder dans Supabase pour que la page Bureau y ait accès
-        await supabase.from('whatsapp_stats').delete().neq('id', 0) // Nettoyer l'ancienne ligne unique
-        await supabase.from('whatsapp_stats').insert([{ stats_json: cumulativeStats }])
+        if (insertError) {
+          throw insertError
+        }
 
-        alert("Fichier analysé et statistiques cumulées avec succès ! 🎉")
+        alert("Fichier analysé et statistiques mises à jour avec succès ! 🎉")
       } catch (error: any) {
-        alert("Erreur lors de l'analyse : " + error.message)
+        alert("Erreur lors de l'analyse ou de l'enregistrement : " + error.message)
       } finally {
         setLoading(false)
       }
@@ -166,9 +106,9 @@ export default function WhatsAppStatsAdminPage() {
 
         <div className="bg-white border rounded-2xl p-8 shadow-sm space-y-6">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-950">📊 Analyseur & Cumul WhatsApp</h1>
+            <h1 className="text-2xl font-extrabold text-gray-950">📊 Analyseur WhatsApp</h1>
             <p className="text-xs text-gray-500 mt-1">
-              Importe un fichier `.txt`. Ses données s'ajouteront automatiquement aux statistiques globales existantes.
+              Importe ton export `.txt` WhatsApp. Cela mettra à jour instantanément les compteurs et les classements du bureau.
             </p>
           </div>
 
@@ -185,13 +125,13 @@ export default function WhatsAppStatsAdminPage() {
                 />
               </label>
             </div>
-            {loading && <p className="text-xs text-purple-600 font-medium animate-pulse">Analyse et cumul en cours...</p>}
+            {loading && <p className="text-xs text-purple-600 font-medium animate-pulse">Analyse en cours...</p>}
           </div>
 
           {stats && (
             <div className="space-y-6 pt-6 border-t">
               <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-                📈 État actuel des statistiques cumulées
+                📈 Aperçu des statistiques actuelles
               </h2>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -204,7 +144,7 @@ export default function WhatsAppStatsAdminPage() {
                   <p className="text-2xl font-extrabold text-amber-900 mt-1">{stats.aperoCount}</p>
                 </div>
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
-                  <p className="text-[11px] text-blue-600 font-bold uppercase">📍 Mot "Cité"</p>
+                  <p className="text-[11px] text-blue-600 font-bold uppercase">🏫 Mentions école</p>
                   <p className="text-2xl font-extrabold text-blue-900 mt-1">{stats.citeCount}</p>
                 </div>
                 <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
