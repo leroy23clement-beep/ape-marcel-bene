@@ -55,57 +55,10 @@ export default function BureauPage() {
   const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
   const canSendNotifications = notificationAllowedRoles.includes(userRole)
 
-  // Fonction de récupération blindée pour parser n'importe quelle structure de données Supabase
-  const extractTopList = (sourceData: any, possibleKeys: string[]) => {
-    if (!sourceData) return []
-
-    // 1. Chercher si l'une des clés existe et contient un tableau ou un objet
-    let target = null
-    for (const key of possibleKeys) {
-      if (sourceData[key]) {
-        target = sourceData[key]
-        break
-      }
-    }
-
-    // Si rien trouvé, on prend la source brute elle-même si c'est un objet
-    if (!target && typeof sourceData === 'object') {
-      target = sourceData
-    }
-
-    // 2. Si c'est un tableau, on le trie et on prend le top 3
-    if (Array.isArray(target)) {
-      return target
-        .map((item: any) => ({
-          name: item.name || item.nom || item.sender || item.author || item.pseudo || item.keyword || item.word || 'Inconnu',
-          count: item.count !== undefined ? item.count : (item.messages || item.emojis || 0)
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 3)
-    }
-
-    // 3. Si c'est un objet (dictionnaire { Nom: score })
-    if (target && typeof target === 'object') {
-      const excludedKeys = ['total', 'count', 'totalMessages', 'aperoCount', 'citeCount', 'questionCount', 'id', 'created_at']
-      const entries = Object.entries(target).filter(([key]) => !excludedKeys.includes(key))
-
-      if (entries.length > 0) {
-        return entries
-          .map(([name, count]) => ({
-            name,
-            count: typeof count === 'number' ? count : (Number(count) || 0)
-          }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 3)
-      }
-    }
-
-    return []
-  }
-
-  const bavardsList = extractTopList(whatsappStats, ['topBavardsList', 'bavards', 'topBavards', 'top_bavards', 'messagesPerUser'])
-  const emojiList = extractTopList(whatsappStats, ['topEmojiUsersList', 'emojiUsers', 'topEmojis', 'top_emojis', 'emojisPerUser'])
-  const aperoWordsList = extractTopList(whatsappStats, ['topAperoWordsList', 'aperoWords', 'motsApero', 'top_apero_words'])
+  // Récupération directe des tableaux exacts renvoyés par le parseur
+  const bavardsList = whatsappStats?.topBavardsList || []
+  const emojiList = whatsappStats?.topEmojiUsersList || []
+  const aperoWordsList = whatsappStats?.topAperoWordsList || []
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -253,7 +206,7 @@ export default function BureauPage() {
                             </div>
                           ))
                         ) : (
-                          <p className="text-xs text-gray-500 italic">Aucune donnée de classement disponible</p>
+                          <p className="text-xs text-gray-500 italic">Aucune donnée disponible</p>
                         )}
                       </div>
                     </div>
@@ -272,7 +225,7 @@ export default function BureauPage() {
                             </div>
                           ))
                         ) : (
-                          <p className="text-xs text-gray-500 italic">Aucune donnée de classement disponible</p>
+                          <p className="text-xs text-gray-500 italic">Aucune donnée disponible</p>
                         )}
                       </div>
                     </div>
@@ -281,13 +234,13 @@ export default function BureauPage() {
                   {/* Top 3 Variantes du mot Apéro */}
                   <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 space-y-2">
                     <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <span>🍻</span> Top 3 des mots "Apéro" & Variantes (apéro, bière, verre, pinard...)
+                      <span>🍻</span> Top 3 des mots "Apéro" & Variantes
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                       {aperoWordsList.length > 0 ? (
                         aperoWordsList.map((word: any, index: number) => (
                           <div key={index} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-lg border border-amber-200">
-                            <span className="font-semibold text-gray-800 capitalize">"{word.name}"</span>
+                            <span className="font-semibold text-gray-800 capitalize">"{word.keyword}"</span>
                             <span className="font-extrabold text-amber-800">{word.count} fois</span>
                           </div>
                         ))
