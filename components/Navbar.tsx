@@ -16,7 +16,6 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     window.location.href = '/login'
   }
 
-  // Fonction pour déterminer le nom affiché selon le rôle
   const getDisplayName = () => {
     if (role === 'admin') return 'Patron'
     if (role === 'tresorier') return 'Picsou'
@@ -25,8 +24,6 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
   }
 
   const displayName = getDisplayName()
-
-  // Tous les rôles qui ont accès à l'Espace Bureau
   const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
   const isBureau = role ? allowedBureauRoles.includes(role.toLowerCase()) : false
 
@@ -34,7 +31,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     { name: 'Tableau de bord', href: '/dashboard' },
     { name: 'Événements', href: '/events' },
     { name: 'Boutique', href: '/shop' },
-    { name: '🎨 Concours Logo', href: '/logo-contest' },
+    { name: '🏫 École', href: '/ecole' },
     { name: 'Soutenir l\'APE', href: '/membership' },
     ...(isBureau ? [{ name: 'Espace Bureau', href: '/bureau' }] : []),
   ]
@@ -43,7 +40,6 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     <nav className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-         {/* Logo / Nom */}
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center gap-2 font-bold text-gray-900 text-lg">
               <img src="/logo.jpg" alt="Logo APE" className="w-8 h-8 object-contain" />
@@ -51,7 +47,6 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
             </Link>
           </div>
 
-          {/* Navigation Desktop */}
           <div className="hidden md:flex items-center space-x-6">
             {navLinks.map((link) => {
               const isActive = pathname === link.href
@@ -69,11 +64,8 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
             })}
           </div>
 
-          {/* Profil, Rôle, Bouton Notifications & Déconnexion Desktop */}
           <div className="hidden md:flex items-center space-x-3">
-            {/* Bouton d'activation push (disparaît une fois activé) */}
             <EnableNotificationsButton />
-
             <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
               <span className="text-xs text-gray-700 font-medium">
                 Bonjour, <strong className="text-gray-900">{displayName}</strong>
@@ -92,7 +84,6 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
             </button>
           </div>
 
-          {/* Bouton Menu Burger Mobile */}
           <div className="flex items-center md:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -104,14 +95,12 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
         </div>
       </div>
 
-      {/* Menu Mobile Déroulant */}
+      {/* Menu Mobile */}
       {isOpen && (
         <div className="md:hidden bg-white border-b px-4 pt-2 pb-4 space-y-3 shadow-lg">
-          {/* Bouton d'activation push en haut du menu mobile */}
           <div className="pb-2 border-b">
             <EnableNotificationsButton />
           </div>
-
           <div className="flex items-center justify-between text-xs text-gray-500 pb-2 border-b">
             <span>Connecté : <strong className="text-gray-800">{displayName}</strong></span>
             {role && role !== 'parent' && (

@@ -17,20 +17,17 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Profil & Foyer
   const { data: profile } = await supabase
     .from("profiles")
     .select("*, households(*)")
     .eq("id", user.id)
     .single();
 
-  // Liste des enfants du foyer
   const { data: children } = await supabase
     .from("children")
     .select("*")
     .eq("household_id", profile?.household_id ?? "");
 
-  // Récupération des prochains événements à venir (pour afficher les dates dans les comptes à rebours)
   const { data: upcomingEvents } = await supabase
     .from("events")
     .select("*")
@@ -38,27 +35,17 @@ export default async function DashboardPage() {
     .order("event_date", { ascending: true })
     .limit(3);
 
-  // Prochain événement APE spécifique pour le bloc de compte à rebours
   const nextApeEvent = upcomingEvents && upcomingEvents.length > 0 ? upcomingEvents[0] : null;
 
-  // Récupération des ventes en cours (table products)
   const { data: products } = await supabase
     .from("products")
     .select("*")
     .order("created_at", { ascending: false });
 
-  // Récupération des actualités de l'école
-  const { data: schoolNotices } = await supabase
-    .from("school_notices")
-    .select("*")
-    .order("notice_date", { ascending: false });
-
-  // Récupération de toutes les transactions financières réelles
   const { data: transactions } = await supabase
     .from("transactions")
     .select("type, amount");
 
-  // Calculs dynamiques basés sur la table transactions (en prenant en compte toutes les variantes de casse et libellés)
   const totalRecettes = transactions
     ?.filter((t) => t.type === 'Recette' || t.type === 'recette' || t.type === 'income' || t.type === 'Recette (Entrée)')
     .reduce((acc, t) => acc + Number(t.amount), 0) ?? 0;
@@ -69,7 +56,6 @@ export default async function DashboardPage() {
 
   const soldeGlobal = totalRecettes - totalDepenses;
 
-  // Fonction utilitaire pour formater joliment la date en français
   const formatDateFr = (dateString: string) => {
     if (!dateString) return "";
     return new Date(dateString).toLocaleDateString("fr-FR", {
@@ -81,8 +67,7 @@ export default async function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Barre de navigation */}
+    <div className="min-h-screen bg-gray-50 pb-12">
       <Navbar 
         userEmail={user.email} 
         firstName={profile?.first_name} 
@@ -91,7 +76,7 @@ export default async function DashboardPage() {
 
       <div className="mx-auto max-w-7xl p-6 flex flex-col space-y-6">
         
-        {/* Encadré de présentation APE */}
+        {/* Présentation APE */}
         <div className="rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-800 text-white p-6 shadow-md flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="space-y-2 text-center md:text-left">
             <span className="bg-purple-600 text-purple-100 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider border border-purple-400">
@@ -112,10 +97,8 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* Comptes à rebours avec ajout explicite des dates */}
+        {/* Comptes à rebours */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
-          {/* Bloc 1 : Prochain rendez-vous (Vacances / Général) */}
           <div className="bg-purple-900 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between space-y-4">
             <div>
               <span className="text-xs uppercase font-bold tracking-wider text-purple-300">Prochain rendez-vous</span>
@@ -127,7 +110,6 @@ export default async function DashboardPage() {
             <HolidayCountdown />
           </div>
 
-          {/* Bloc 2 : Prochain événement APE dynamique */}
           <div className="bg-emerald-800 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between space-y-4">
             <div>
               <span className="text-xs uppercase font-bold tracking-wider text-emerald-200">Prochain événement APE</span>
@@ -142,13 +124,10 @@ export default async function DashboardPage() {
             </div>
             <ApeEventCountdown />
           </div>
-
         </div>
 
-        {/* 1. Indicateurs Financiers dynamiques */}
+        {/* Indicateurs Financiers */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          
-          {/* Solde Net Global cliquable vers la trésorerie détaillée */}
           <Link 
             href="/bureau/tresorerie"
             className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between hover:border-purple-500 transition cursor-pointer group"
@@ -166,7 +145,6 @@ export default async function DashboardPage() {
             </div>
           </Link>
 
-          {/* Total Recettes */}
           <div className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -181,7 +159,6 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* Total Dépenses */}
           <div className="rounded-xl border bg-white p-5 shadow-sm flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -197,23 +174,18 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Disposition en 3 colonnes pour la suite du contenu */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Disposition en 2 colonnes (Événements & Boutique) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           
-          {/* COLONNE 1 : Prochains Événements */}
           <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b pb-2">
               <h2 className="font-semibold text-gray-800 text-base">
                 Prochains Événements
               </h2>
-              <Link 
-                href="/events" 
-                className="text-xs font-medium text-purple-700 hover:underline"
-              >
+              <Link href="/events" className="text-xs font-medium text-purple-700 hover:underline">
                 Voir tout ↗
               </Link>
             </div>
-
             <div className="space-y-3">
               {upcomingEvents && upcomingEvents.length > 0 ? (
                 upcomingEvents.map((event) => (
@@ -225,39 +197,27 @@ export default async function DashboardPage() {
                     <div className="flex justify-between items-start">
                       <h3 className="font-bold text-xs text-gray-900">{event.title}</h3>
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
-                        {new Date(event.event_date).toLocaleDateString("fr-FR", {
-                          day: "numeric",
-                          month: "short"
-                        })}
+                        {new Date(event.event_date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
                       </span>
                     </div>
-                    {event.location && (
-                      <p className="text-[11px] text-gray-500">📍 {event.location}</p>
-                    )}
+                    {event.location && <p className="text-[11px] text-gray-500">📍 {event.location}</p>}
                   </Link>
                 ))
               ) : (
-                <p className="text-xs text-gray-500 italic">
-                  Aucun événement à venir.
-                </p>
+                <p className="text-xs text-gray-500 italic">Aucun événement à venir.</p>
               )}
             </div>
           </div>
 
-          {/* COLONNE 2 : Boutique & Ventes en cours */}
           <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b pb-2">
               <h2 className="font-semibold text-gray-800 text-base">
                 Boutique & Ventes
               </h2>
-              <Link 
-                href="/shop" 
-                className="text-xs font-medium text-purple-700 hover:underline"
-              >
+              <Link href="/shop" className="text-xs font-medium text-purple-700 hover:underline">
                 Accéder ↗
               </Link>
             </div>
-
             <div className="space-y-3">
               {products && products.length > 0 ? (
                 products.map((product) => (
@@ -272,65 +232,37 @@ export default async function DashboardPage() {
                         {product.price ? `${product.price.toFixed(2)} €` : ""}
                       </span>
                     </div>
-                    {product.description && (
-                      <p className="text-[11px] text-gray-500 line-clamp-1">{product.description}</p>
-                    )}
+                    {product.description && <p className="text-[11px] text-gray-500 line-clamp-1">{product.description}</p>}
                   </Link>
                 ))
               ) : (
-                <p className="text-xs text-gray-500 italic">
-                  Aucune vente en cours.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* COLONNE 3 : Le coin de l'école (Infos & Rappels Dynamiques avec notice_date) */}
-          <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
-            <div className="flex justify-between items-center border-b pb-2">
-              <h2 className="font-semibold text-gray-800 text-base flex items-center gap-1.5">
-                <span>🏫</span> Le coin de l'école
-              </h2>
-              {profile?.role !== 'parent' && (
-                <Link href="/admin/school-notices" className="text-[11px] text-purple-700 hover:underline font-medium">
-                  Gérer ⚙️
-                </Link>
-              )}
-            </div>
-
-            <div className="space-y-3 text-xs">
-              {schoolNotices && schoolNotices.length > 0 ? (
-                schoolNotices.map((notice) => (
-                  <div 
-                    key={notice.id} 
-                    className={`p-3 border rounded-lg space-y-1.5 ${
-                      notice.category === 'photo' ? 'bg-blue-50/60 border-blue-100 text-blue-900' :
-                      notice.category === 'trip' ? 'bg-amber-50/60 border-amber-100 text-amber-900' :
-                      'bg-purple-50/60 border-purple-100 text-purple-900'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <span className="font-bold">{notice.title}</span>
-                      {notice.notice_date && (
-                        <span className="text-[10px] opacity-75 whitespace-nowrap font-medium">
-                          📅 {new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-gray-600">{notice.content}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-gray-500 italic">
-                  Aucune information scolaire pour le moment.
-                </p>
+                <p className="text-xs text-gray-500 italic">Aucune vente en cours.</p>
               )}
             </div>
           </div>
 
         </div>
 
-        {/* 4. Mon Foyer & Enfants (En bas sur toute la largeur) */}
+        {/* NOUVEAU BLOC : Concours Logo (Placé juste au-dessus de Mon Foyer) */}
+        <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 p-6 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="space-y-1 text-center md:text-left">
+            <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              🎨 Événement spécial
+            </span>
+            <h2 className="text-xl font-extrabold text-amber-900">Concours du nouveau Logo APE</h2>
+            <p className="text-xs text-amber-700 max-w-xl">
+              Propose ta création ou vote pour le futur logo officiel de l'association qui représentera nos écoles de Muizon !
+            </p>
+          </div>
+          <Link
+            href="/logo-contest"
+            className="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition text-xs whitespace-nowrap cursor-pointer"
+          >
+            Participer au concours →
+          </Link>
+        </div>
+
+        {/* Mon Foyer & Enfants */}
         <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
           <h2 className="font-semibold text-gray-800 text-lg border-b pb-2">
             Mon Foyer & Enfants
