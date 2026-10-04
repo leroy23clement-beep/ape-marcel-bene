@@ -36,11 +36,86 @@ export default function WhatsAppStatsAdminPage() {
       } else {
         setProfile(profileData)
       }
+
+      // Charger les stats existantes depuis Supabase
+      const { data: existingData } = await supabase
+        .from('whatsapp_stats')
+        .select('*')
+        .order('id', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (existingData) {
+        setStats(existingData.stats_json)
+      }
     }
     checkUserAndAdmin()
   }, [router])
 
-  // Fonction gérant la lecture du fichier texte WhatsApp uploadé
+  // Fonction de fusion de deux objets de statistiques
+  function mergeStats(oldStats: any, newStats: any) {
+    if (!oldStats) return newStats
+
+    const totalMessages = oldStats.totalMessages + newStats.totalMessages
+    const aperoCount = oldStats.aperoCount + newStats.aperoCount
+    const citeCount = oldStats.citeCount + newStats.citeCount
+    const totalEmojis = oldStats.totalEmojis + newStats.totalEmojis
+    const nightMessagesCount = oldStats.nightMessagesCount + newStats.nightMessagesCount
+    const morningMessagesCount = oldStats.morningMessagesCount + newStats.morningMessagesCount
+    const questionCount = oldStats.questionCount + newStats.questionCount
+    const shoutCount = oldStats.shoutCount + newStats.shoutCount
+
+    // Fusion des messages par utilisateur
+    const userMessageCount = { ...oldStats.userMessageCount }
+    for (const [author, count] of Object.entries(newStats.userMessageCount || {})) {
+      userMessageCount[author] = (userMessageCount[author] || 0) as number + (count as number)
+    }
+
+    // Fusion des emojis par utilisateur
+    const userEmojiCount = { ...oldStats.userEmojiCount }
+    for (const [author, count] of Object.entries(newStats.userEmojiCount || {})) {
+      userEmojiCount[author] = (userEmojiCount[author] || 0) as number + (count as number)
+    }
+
+    // Trouver le nouveau top bavard
+    let topBavard = { name: 'Personne', count: 0 }
+    for (const [author, count] of Object.entries(userMessageCount)) {
+      if ((count as number) > topBavard.count) {
+        topBavard = { name: author, count: count as number }
+      }
+    }
+
+    // Trouver le nouveau roi des emojis
+    let topEmojiUser = { name: 'Personne', count: 0 }
+    for (const [author, count] of Object.entries(userEmojiCount)) {
+      if ((count as number) > topEmojiUser.count) {
+        topEmojiUser = { name: author, count: count as number }
+      }
+    }
+
+    // Garder le message le plus long entre les deux
+    const longestMessage = (newStats.longestMessage.length > (oldStats.longestMessage?.length || 0))
+      ? newStats.longestMessage
+      : oldStats.longestMessage
+
+    return {
+      totalMessages,
+      aperoCount,
+      citeCount,
+      totalEmojis,
+      nightMessagesCount,
+      morningMessagesCount,
+      questionCount,
+      shoutCount,
+      userMessageCount,
+      userEmojiCount,
+      topBavard,
+      topEmojiUser,
+      longestMessage
+    }
+  }
+
+  // Lecture et cumul du fichier uploadé
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -51,11 +126,19 @@ export default function WhatsAppStatsAdminPage() {
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string
-        // Analyse du texte avec notre parser complet
-        const analysisResults = parseWhatsAppExport(content)
-        setStats(analysisResults)
+        const newAnalysis = parseWhatsAppExport(content)
+
+        // Cumuler avec les stats précédentes stockées dans l'état
+        const cumulativeStats = mergeStats(stats, newAnalysis)
+        setStats(cumulativeStats)
+
+        // Sauvegarder dans Supabase pour que la page Bureau y ait accès
+        await supabase.from('whatsapp_stats').delete().neq('id', 0) // Nettoyer l'ancienne ligne unique
+        await supabase.from('whatsapp_stats').insert([{ stats_json: cumulativeStats }])
+
+        alert("Fichier analysé et statistiques cumulées avec succès ! 🎉")
       } catch (error: any) {
-        alert("Erreur lors de l'analyse du fichier : " + error.message)
+        alert("Erreur lors de l'analyse : " + error.message)
       } finally {
         setLoading(false)
       }
@@ -83,9 +166,9 @@ export default function WhatsAppStatsAdminPage() {
 
         <div className="bg-white border rounded-2xl p-8 shadow-sm space-y-6">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-950">📊 Analyseur de WhatsApp - APE</h1>
+            <h1 className="text-2xl font-extrabold text-gray-950">📊 Analyseur & Cumul WhatsApp</h1>
             <p className="text-xs text-gray-500 mt-1">
-              Importe ton fichier d'export WhatsApp (`.txt`) pour générer les statistiques marrantes du bureau.
+              Importe un fichier `.txt`. Ses données s'ajouteront automatiquement aux statistiques globales existantes.
             </p>
           </div>
 
@@ -93,7 +176,7 @@ export default function WhatsAppStatsAdminPage() {
             <span className="text-3xl">📱</span>
             <div>
               <label className="cursor-pointer bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow transition inline-block">
-                Sélectionner le fichier d'export (.txt)
+                Sélectionner un fichier d'export (.txt)
                 <input 
                   type="file" 
                   accept=".txt" 
@@ -102,17 +185,15 @@ export default function WhatsAppStatsAdminPage() {
                 />
               </label>
             </div>
-            {loading && <p className="text-xs text-purple-600 font-medium animate-pulse">Analyse des messages en cours...</p>}
+            {loading && <p className="text-xs text-purple-600 font-medium animate-pulse">Analyse et cumul en cours...</p>}
           </div>
 
-          {/* Affichage des résultats complets de l'analyse */}
           {stats && (
             <div className="space-y-6 pt-6 border-t">
               <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
-                🎉 Résultats de l'analyse détaillée
+                📈 État actuel des statistiques cumulées
               </h2>
 
-              {/* Grille principale des compteurs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 text-center">
                   <p className="text-[11px] text-purple-600 font-bold uppercase">Messages totaux</p>
@@ -127,32 +208,9 @@ export default function WhatsAppStatsAdminPage() {
                   <p className="text-2xl font-extrabold text-blue-900 mt-1">{stats.citeCount}</p>
                 </div>
                 <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
-                  <p className="text-[11px] text-emerald-600 font-bold uppercase">❓ Questions posées</p>
+                  <p className="text-[11px] text-emerald-600 font-bold uppercase">❓ Questions</p>
                   <p className="text-2xl font-extrabold text-emerald-900 mt-1">{stats.questionCount}</p>
                 </div>
-              </div>
-
-              {/* Statistiques décalées */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-50 p-4 rounded-xl border space-y-1">
-                  <p className="text-xs font-bold text-gray-800">🏆 Le plus gros bavard :</p>
-                  <p className="text-xs text-purple-700 font-extrabold">{stats.topBavard.name} ({stats.topBavard.count} msgs)</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border space-y-1">
-                  <p className="text-xs font-bold text-gray-800">👑 Roi/Reine des emojis :</p>
-                  <p className="text-xs text-purple-700 font-extrabold">{stats.topEmojiUser.name} ({stats.topEmojiUser.count} emojis)</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-xl border space-y-1">
-                  <p className="text-xs font-bold text-gray-800">🌙 Nuit / ☕ Matinaux :</p>
-                  <p className="text-xs text-purple-700 font-extrabold">{stats.nightMessagesCount} de nuit / {stats.morningMessagesCount} matins</p>
-                </div>
-              </div>
-
-              {/* Le Pavé d'or */}
-              <div className="bg-purple-900 text-white p-5 rounded-xl space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-purple-200">📜 Le Pavé d'or (Message le plus long) :</p>
-                <p className="text-xs italic text-purple-100">"{stats.longestMessage.text}"</p>
-                <p className="text-[11px] text-purple-300 text-right">— Envoyé par {stats.longestMessage.author} ({stats.longestMessage.length} caractères)</p>
               </div>
             </div>
           )}

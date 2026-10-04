@@ -10,6 +10,7 @@ export default function BureauPage() {
   const supabase = createClient()
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [whatsappStats, setWhatsappStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -21,17 +22,30 @@ export default function BureauPage() {
       }
       setUser(user)
 
+      // Charger le profil
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
-        
       setProfile(profileData)
+
+      // Charger les statistiques WhatsApp stockées
+      const { data: statsData } = await supabase
+        .from('whatsapp_stats')
+        .select('*')
+        .order('id', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (statsData) {
+        setWhatsappStats(statsData.stats_json)
+      }
+
       setLoading(false)
     }
     loadData()
-  }, [])
+  }, [supabase])
 
   if (loading) return null
   if (!user) return null
@@ -46,7 +60,7 @@ export default function BureauPage() {
   const canSendNotifications = notificationAllowedRoles.includes(userRole)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-12">
       <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
 
       <main className="mx-auto max-w-4xl p-6 space-y-6">
@@ -139,20 +153,65 @@ export default function BureauPage() {
                 </p>
               </Link>
 
-              {/* Carte Widget WhatsApp / Baromètre du Bureau */}
+              {/* Carte Module d'import WhatsApp (Admin) */}
               <Link 
                 href="/admin/whatsapp"
                 className="block bg-purple-50 border border-purple-200 rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-purple-900 group-hover:text-purple-700 transition">📊 WhatsApp - Le Baromètre</h3>
-                  <span className="text-xs text-purple-700 font-medium">Analyser →</span>
+                  <h3 className="text-base font-semibold text-purple-900 group-hover:text-purple-700 transition">📊 Gérer les stats WhatsApp</h3>
+                  <span className="text-xs text-purple-700 font-medium">Importer un fichier →</span>
                 </div>
                 <p className="text-xs text-purple-700">
-                  Importe l'export de la discussion pour découvrir les stats marrantes (apéros, emojis, pavé d'or, etc.).
+                  Importer un nouvel export `.txt` pour mettre à jour et cumuler les statistiques du bureau.
                 </p>
               </Link>
 
+            </div>
+
+            {/* Widget des Statistiques WhatsApp cumulées sur la page Bureau */}
+            <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <span>📈</span> Le Baromètre WhatsApp du Bureau (Cumulé)
+              </h2>
+
+              {whatsappStats ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-center">
+                      <p className="text-[10px] text-purple-600 font-bold uppercase">Messages totaux</p>
+                      <p className="text-xl font-extrabold text-purple-900 mt-0.5">{whatsappStats.totalMessages}</p>
+                    </div>
+                    <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-center">
+                      <p className="text-[10px] text-amber-600 font-bold uppercase">🍻 Compteur Apéro</p>
+                      <p className="text-xl font-extrabold text-amber-900 mt-0.5">{whatsappStats.aperoCount}</p>
+                    </div>
+                    <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-center">
+                      <p className="text-[10px] text-blue-600 font-bold uppercase">📍 Mot "Cité"</p>
+                      <p className="text-xl font-extrabold text-blue-900 mt-0.5">{whatsappStats.citeCount}</p>
+                    </div>
+                    <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center">
+                      <p className="text-[10px] text-emerald-600 font-bold uppercase">❓ Questions</p>
+                      <p className="text-xl font-extrabold text-emerald-900 mt-0.5">{whatsappStats.questionCount}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-gray-50 p-3 rounded-xl border flex justify-between items-center">
+                      <span className="font-bold text-gray-700">🏆 Plus gros bavard :</span>
+                      <span className="font-extrabold text-purple-800">{whatsappStats.topBavard?.name} ({whatsappStats.topBavard?.count} msgs)</span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-xl border flex justify-between items-center">
+                      <span className="font-bold text-gray-700">👑 Roi/Reine des emojis :</span>
+                      <span className="font-extrabold text-purple-800">{whatsappStats.topEmojiUser?.name} ({whatsappStats.topEmojiUser?.count} emojis)</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 italic">
+                  Aucune statistique disponible pour le moment. Importe un premier fichier `.txt` via le bouton de gestion ci-dessus !
+                </p>
+              )}
             </div>
 
             {/* Section Notifications Push (Réservée Admin, Trésorier, Secrétaire) */}
