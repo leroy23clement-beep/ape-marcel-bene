@@ -55,6 +55,25 @@ export default function BureauPage() {
   const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
   const canSendNotifications = notificationAllowedRoles.includes(userRole)
 
+  // Fonction utilitaire sécurisée pour transformer n'importe quel format en Top 3 exploitable
+  const getTopList = (listData: any) => {
+    if (!listData) return []
+    // Si c'est déjà un tableau
+    if (Array.isArray(listData)) return listData.slice(0, 3)
+    // Si c'est un objet (ex: dictionnaire { Nom: count })
+    if (typeof listData === 'object') {
+      return Object.entries(listData)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 3)
+    }
+    return []
+  }
+
+  const bavardsList = getTopList(whatsappStats?.topBavardsList || whatsappStats?.bavards || whatsappStats?.topBavards)
+  const emojiList = getTopList(whatsappStats?.topEmojiUsersList || whatsappStats?.emojiUsers || whatsappStats?.topEmojis)
+  const aperoWordsList = getTopList(whatsappStats?.topAperoWordsList || whatsappStats?.aperoWords || whatsappStats?.motsApero)
+
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
@@ -193,16 +212,19 @@ export default function BureauPage() {
                         <span>🏆</span> Top 3 des plus gros bavards
                       </h3>
                       <div className="space-y-1.5">
-                        {whatsappStats.topBavardsList?.map((user: any, index: number) => {
-                          const userName = user.name || user.nom || user.sender || user.author || user.pseudo || `Utilisateur ${index + 1}`
-                          return (
-                            <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
-                              <span className="font-semibold text-gray-800">{index + 1}. {userName}</span>
-                              <span className="font-extrabold text-purple-700">{user.count} msgs</span>
-                            </div>
-                          )
-                        }) || (
-                          <p className="text-xs text-gray-500 italic">Données indisponibles</p>
+                        {bavardsList.length > 0 ? (
+                          bavardsList.map((item: any, index: number) => {
+                            const displayName = item.name || item.nom || item.sender || item.author || item.pseudo || `Utilisateur ${index + 1}`
+                            const displayCount = item.count !== undefined ? item.count : (item.messages || 0)
+                            return (
+                              <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
+                                <span className="font-semibold text-gray-800">{index + 1}. {displayName}</span>
+                                <span className="font-extrabold text-purple-700">{displayCount} msgs</span>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className="text-xs text-gray-500 italic">Aucune donnée de classement disponible</p>
                         )}
                       </div>
                     </div>
@@ -213,16 +235,19 @@ export default function BureauPage() {
                         <span>👑</span> Top 3 Rois/Reines des Emojis
                       </h3>
                       <div className="space-y-1.5">
-                        {whatsappStats.topEmojiUsersList?.map((user: any, index: number) => {
-                          const userName = user.name || user.nom || user.sender || user.author || user.pseudo || `Utilisateur ${index + 1}`
-                          return (
-                            <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
-                              <span className="font-semibold text-gray-800">{index + 1}. {userName}</span>
-                              <span className="font-extrabold text-purple-700">{user.count} emojis</span>
-                            </div>
-                          )
-                        }) || (
-                          <p className="text-xs text-gray-500 italic">Données indisponibles</p>
+                        {emojiList.length > 0 ? (
+                          emojiList.map((item: any, index: number) => {
+                            const displayName = item.name || item.nom || item.sender || item.author || item.pseudo || `Utilisateur ${index + 1}`
+                            const displayCount = item.count !== undefined ? item.count : (item.emojis || 0)
+                            return (
+                              <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
+                                <span className="font-semibold text-gray-800">{index + 1}. {displayName}</span>
+                                <span className="font-extrabold text-purple-700">{displayCount} emojis</span>
+                              </div>
+                            )
+                          })
+                        ) : (
+                          <p className="text-xs text-gray-500 italic">Aucune donnée de classement disponible</p>
                         )}
                       </div>
                     </div>
@@ -234,12 +259,14 @@ export default function BureauPage() {
                       <span>🍻</span> Top 3 des mots "Apéro" & Variantes (apéro, bière, verre, pinard...)
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                      {whatsappStats.topAperoWordsList?.map((word: any, index: number) => (
-                        <div key={index} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-lg border border-amber-200">
-                          <span className="font-semibold text-gray-800 capitalize">"{word.keyword}"</span>
-                          <span className="font-extrabold text-amber-800">{word.count} fois</span>
-                        </div>
-                      )) || (
+                      {aperoWordsList.length > 0 ? (
+                        aperoWordsList.map((word: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-lg border border-amber-200">
+                            <span className="font-semibold text-gray-800 capitalize">"{word.keyword || word.word || word.name}"</span>
+                            <span className="font-extrabold text-amber-800">{word.count} fois</span>
+                          </div>
+                        ))
+                      ) : (
                         <p className="text-xs text-gray-500 italic col-span-3">Aucune variante détectée</p>
                       )}
                     </div>
