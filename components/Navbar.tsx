@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -11,6 +11,22 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const pathname = usePathname()
   const supabase = createClient()
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fermer le menu si on clique en dehors
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
 
   // Vérifier si les notifications sont activées sur cet appareil
   useEffect(() => {
@@ -20,7 +36,6 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
       setNotificationsEnabled(isEnabled)
     }
     checkNotifications()
-    // Vérification régulière au cas où l'état change
     const interval = setInterval(checkNotifications, 2000)
     return () => clearInterval(interval)
   }, [])
@@ -41,22 +56,22 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
   const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
   const isBureau = role ? allowedBureauRoles.includes(role.toLowerCase()) : false
 
-  // Liens de la barre du haut
+  // Liens de la barre du haut (sans émoji sur École)
   const navLinks = [
     { name: 'Accueil', href: '/dashboard' },
     { name: 'Événements', href: '/events' },
     { name: 'Boutique', href: '/shop' },
-    { name: '🏫 École', href: '/ecole' },
+    { name: 'École', href: '/ecole' },
     { name: 'Soutenir l\'APE', href: '/membership' },
     ...(isBureau ? [{ name: 'Espace Bureau', href: '/bureau' }] : []),
   ]
 
-  // Liens complets pour le menu déroulant de droite (style Aqua Reims)
+  // Liens complets pour le menu déroulant de droite (avec Galerie et Découvrir l'asso)
   const menuDrawerLinks = [
     { name: 'Accueil', href: '/dashboard' },
     { name: 'Événements', href: '/events' },
     { name: 'Boutique', href: '/shop' },
-    { name: '🏫 École', href: '/ecole' },
+    { name: 'École', href: '/ecole' },
     { name: 'Galerie', href: '/gallery' },
     { name: 'Découvrir l\'association', href: '/about' },
     { name: 'Soutenir l\'APE', href: '/membership' },
@@ -64,7 +79,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
   ]
 
   return (
-    <nav className="bg-white border-b shadow-sm sticky top-0 z-50">
+    <nav className="bg-white border-b shadow-sm sticky top-0 z-50" ref={menuRef}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           
@@ -107,7 +122,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
             })}
           </div>
 
-          {/* Côté droit : Notifications (si non activées), Infos utilisateur, Déconnexion et Menu Burger */}
+          {/* Côté droit : Notifications, Infos utilisateur et Menu Burger (Déconnexion retirée d'ici) */}
           <div className="flex items-center space-x-3">
             {!notificationsEnabled && (
               <div className="hidden sm:block">
@@ -126,13 +141,6 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
               )}
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="hidden md:block text-xs font-medium text-red-600 hover:text-red-800 border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition cursor-pointer"
-            >
-              Déconnexion
-            </button>
-
             {/* Bouton Menu Burger en haut à droite */}
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -145,7 +153,7 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
         </div>
       </div>
 
-      {/* Menu déroulant latéral de droite (style Aqua Reims) */}
+      {/* Menu déroulant latéral de droite */}
       {isOpen && (
         <div className="absolute top-20 right-4 w-72 bg-white border rounded-2xl shadow-xl px-5 py-6 space-y-4 z-50 animate-in fade-in slide-in-from-top-2">
           
