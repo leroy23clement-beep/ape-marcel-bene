@@ -193,12 +193,15 @@ export default function BureauPage() {
                         <span>🏆</span> Top 3 des plus gros bavards
                       </h3>
                       <div className="space-y-1.5">
-                        {whatsappStats.topBavardsList?.map((user: any, index: number) => (
-                          <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
-                            <span className="font-semibold text-gray-800">{index + 1}. {user.name}</span>
-                            <span className="font-extrabold text-purple-700">{user.count} msgs</span>
-                          </div>
-                        )) || (
+                        {whatsappStats.topBavardsList?.map((user: any, index: number) => {
+                          const userName = user.name || user.nom || user.sender || user.author || user.pseudo || `Utilisateur ${index + 1}`
+                          return (
+                            <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
+                              <span className="font-semibold text-gray-800">{index + 1}. {userName}</span>
+                              <span className="font-extrabold text-purple-700">{user.count} msgs</span>
+                            </div>
+                          )
+                        }) || (
                           <p className="text-xs text-gray-500 italic">Données indisponibles</p>
                         )}
                       </div>
@@ -210,12 +213,15 @@ export default function BureauPage() {
                         <span>👑</span> Top 3 Rois/Reines des Emojis
                       </h3>
                       <div className="space-y-1.5">
-                        {whatsappStats.topEmojiUsersList?.map((user: any, index: number) => (
-                          <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
-                            <span className="font-semibold text-gray-800">{index + 1}. {user.name}</span>
-                            <span className="font-extrabold text-purple-700">{user.count} emojis</span>
-                          </div>
-                        )) || (
+                        {whatsappStats.topEmojiUsersList?.map((user: any, index: number) => {
+                          const userName = user.name || user.nom || user.sender || user.author || user.pseudo || `Utilisateur ${index + 1}`
+                          return (
+                            <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
+                              <span className="font-semibold text-gray-800">{index + 1}. {userName}</span>
+                              <span className="font-extrabold text-purple-700">{user.count} emojis</span>
+                            </div>
+                          )
+                        }) || (
                           <p className="text-xs text-gray-500 italic">Données indisponibles</p>
                         )}
                       </div>
