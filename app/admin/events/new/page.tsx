@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 
-export default function NewEventPage() {
+function EventFormContent() {
   const supabase = createClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const eventId = searchParams.get('id') // Récupération de l'ID s'il est présent dans l'URL
 
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -45,6 +47,33 @@ export default function NewEventPage() {
     }
     checkUserAndAdmin()
   }, [router])
+
+  // Si un ID est présent dans l'URL, on charge les données de l'événement pour les pré-remplir
+  useEffect(() => {
+    if (!eventId) return
+
+    async function fetchEventToEdit() {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single()
+
+      if (data) {
+        setTitle(data.title || '')
+        setDescription(data.description || '')
+        // Formatage de la date pour le champ 'datetime-local' (YYYY-MM-DDThh:mm)
+        if (data.event_date) {
+          setEventDate(data.event_date.slice(0, 16))
+        }
+        setLocation(data.location || '')
+        setImageUrl(data.image_url || '')
+      } else if (error) {
+        alert("Erreur lors du chargement de l'événement : " + error.message)
+      }
+    }
+    fetchEventToEdit()
+  }, [eventId])
 
   // Fonction pour gérer l'upload du fichier image vers le bucket 'events-images'
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -83,20 +112,39 @@ export default function NewEventPage() {
     e.preventDefault()
     setLoading(true)
 
-    const { error } = await supabase.from('events').insert([
-      {
-        title,
-        description,
-        event_date: eventDate,
-        location: location || null,
-        image_url: imageUrl || null,
-      },
-    ])
+    let error
+
+    if (eventId) {
+      // Mode Modification (UPDATE)
+      const res = await supabase
+        .from('events')
+        .update({
+          title,
+          description,
+          event_date: eventDate,
+          location: location || null,
+          image_url: imageUrl || null,
+        })
+        .eq('id', eventId)
+      error = res.error
+    } else {
+      // Mode Création (INSERT)
+      const res = await supabase.from('events').insert([
+        {
+          title,
+          description,
+          event_date: eventDate,
+          location: location || null,
+          image_url: imageUrl || null,
+        },
+      ])
+      error = res.error
+    }
 
     setLoading(false)
 
     if (error) {
-      alert("Erreur lors de la création de l'événement : " + error.message)
+      alert("Erreur lors de l'enregistrement de l'événement : " + error.message)
     } else {
       router.push('/events')
     }
@@ -120,7 +168,9 @@ export default function NewEventPage() {
         </div>
 
         <div className="bg-white border rounded-2xl p-8 shadow-sm space-y-6">
-          <h1 className="text-2xl font-extrabold text-gray-900">Ajouter un nouvel événement</h1>
+          <h1 className="text-2xl font-extrabold text-gray-950">
+            {eventId ? "Modifier l'événement" : "Ajouter un nouvel événement"}
+          </h1>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
@@ -198,12 +248,20 @@ export default function NewEventPage() {
                 disabled={loading || uploading}
                 className="px-5 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition font-semibold cursor-pointer disabled:opacity-50"
               >
-                {loading ? 'Création en cours...' : 'Publier l\'événement'}
+                {loading ? 'Enregistrement en cours...' : (eventId ? 'Mettre à jour' : 'Publier l\'événement')}
               </button>
             </div>
           </form>
         </div>
       </main>
     </div>
+  )
+}
+
+export default function NewEventPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-gray-500">Chargement...</div>}>
+      <EventFormContent />
+    </Suspense>
   )
 }
