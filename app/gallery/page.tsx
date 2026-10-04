@@ -22,7 +22,6 @@ export default function GalleryIndexPage() {
         setProfile(prof)
       }
 
-      // Récupérer les galeries (liées aux événements)
       const { data } = await supabase
         .from('event_galleries')
         .select('*, events(title, event_date)')
@@ -33,6 +32,8 @@ export default function GalleryIndexPage() {
     }
     loadData()
   }, [])
+
+  const isAdminOrBureau = profile?.role && profile.role !== 'parent'
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-500">Chargement des galeries...</div>
@@ -52,6 +53,15 @@ export default function GalleryIndexPage() {
               Retrouvez tous les souvenirs en images des manifestations de l'association.
             </p>
           </div>
+
+          {isAdminOrBureau && (
+            <Link 
+              href="/gallery/new"
+              className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow transition"
+            >
+              + Créer une galerie
+            </Link>
+          )}
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
