@@ -1,7 +1,62 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import Navbar from "@/components/Navbar";
-import { addSchoolNotice, updateNotice, deleteNotice } from "./actions";
+
+// --- Actions serveur intégrées directement ---
+
+async function addSchoolNotice(formData: FormData) {
+  'use server'
+  const supabaseServer = await createClient();
+  const title = formData.get('title') as string;
+  const content = formData.get('content') as string;
+  const category = formData.get('category') as string;
+  const notice_date = formData.get('notice_date') as string;
+
+  if (!title) return;
+
+  await supabaseServer.from("school_notices").insert({
+    title,
+    content: content || '',
+    category: category || 'info',
+    notice_date: notice_date || new Date().toISOString()
+  });
+
+  revalidatePath('/ecole');
+}
+
+async function updateNotice(formData: FormData) {
+  'use server'
+  const supabaseServer = await createClient();
+  const id = formData.get('id') as string;
+  const title = formData.get('title') as string;
+  const content = formData.get('content') as string;
+  const category = formData.get('category') as string;
+  const notice_date = formData.get('notice_date') as string;
+
+  if (!id || !title) return;
+
+  await supabaseServer.from("school_notices").update({
+    title,
+    content: content || '',
+    category: category || 'info',
+    notice_date: notice_date || new Date().toISOString()
+  }).eq('id', id);
+
+  revalidatePath('/ecole');
+}
+
+async function deleteNotice(formData: FormData) {
+  'use server'
+  const supabaseServer = await createClient();
+  const id = formData.get('id') as string;
+  if (!id) return;
+
+  await supabaseServer.from("school_notices").delete().eq('id', id);
+  revalidatePath('/ecole');
+}
+
+// --- Composant principal de la page ---
 
 export default async function EcolePage() {
   const supabase = await createClient();
