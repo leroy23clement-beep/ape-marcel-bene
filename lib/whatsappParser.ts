@@ -19,7 +19,7 @@ export function parseWhatsAppExport(fileContent: string) {
 
   // Regex classique pour les exports WhatsApp
   const regexWhatsApp = /^\[?(\d{2}\/\d{2}\/\d{2,4}),?\s*(\d{2}:\d{2})(?::\d{2})?\]?\s*([^:-]+)[:|-]\s*(.*)$/
-  const emojiRegex = /[\p{Extended_Pictographic}/u]g
+ const emojiRegex = /[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}]/gu;
 
   for (const line of lines) {
     const match = line.match(regexWhatsApp)
