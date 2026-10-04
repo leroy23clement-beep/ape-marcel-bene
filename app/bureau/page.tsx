@@ -41,7 +41,7 @@ export default function BureauPage() {
   const userRole = profile?.role ? profile.role.toLowerCase() : 'parent'
   const isBureau = allowedBureauRoles.includes(userRole)
 
-  // Rôles stricts autorisés à envoyer des notifications push (ex: admin, tresorier, secretaire)
+  // Rôles stricts autorisés à envoyer des notifications push
   const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
   const canSendNotifications = notificationAllowedRoles.includes(userRole)
 
@@ -136,6 +136,20 @@ export default function BureauPage() {
                 </div>
                 <p className="text-xs text-gray-600">
                   Ajouter ou modifier les membres de l'équipe affichés publiquement.
+                </p>
+              </Link>
+
+              {/* Carte Widget WhatsApp / Baromètre du Bureau */}
+              <Link 
+                href="/admin/whatsapp"
+                className="block bg-purple-50 border border-purple-200 rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-purple-900 group-hover:text-purple-700 transition">📊 WhatsApp - Le Baromètre</h3>
+                  <span className="text-xs text-purple-700 font-medium">Analyser →</span>
+                </div>
+                <p className="text-xs text-purple-700">
+                  Importe l'export de la discussion pour découvrir les stats marrantes (apéros, emojis, pavé d'or, etc.).
                 </p>
               </Link>
 
