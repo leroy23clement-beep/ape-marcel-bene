@@ -22,37 +22,46 @@ export default async function EcolePage() {
 
   const isAdminOrBureau = profile?.role && profile.role !== 'parent';
 
-  // Récupération des actualités de l'école
+  // Récupération de toutes les données de school_notices
   const { data: schoolNotices } = await supabase
     .from("school_notices")
     .select("*")
     .order("notice_date", { ascending: false });
 
-  // Séparation des données par catégorie
+  // Tri par catégorie
   const eventsList = schoolNotices?.filter((notice) => notice.category === 'trip') || [];
-  const generalInfosList = schoolNotices?.filter((notice) => notice.category !== 'trip') || [];
+  const linksList = schoolNotices?.filter((notice) => notice.category === 'link') || [];
+  const generalInfosList = schoolNotices?.filter((notice) => notice.category !== 'trip' && notice.category !== 'link') || [];
 
-  // Action pour ajouter une information scolaire
+  // Actions serveur
   async function addSchoolNotice(formData: FormData) {
     'use server'
     const supabaseServer = await createClient();
-    
     const title = formData.get('title') as string;
     const content = formData.get('content') as string;
     const category = formData.get('category') as string;
     const notice_date = formData.get('notice_date') as string;
 
-    if (!title || !content) return;
+    if (!title) return;
 
     await supabaseServer.from("school_notices").insert({
       title,
-      content,
+      content: content || '',
       category: category || 'info',
       notice_date: notice_date || new Date().toISOString()
     });
 
     revalidatePath('/ecole');
-    revalidatePath('/dashboard');
+  }
+
+  async function deleteNotice(formData: FormData) {
+    'use server'
+    const supabaseServer = await createClient();
+    const id = formData.get('id') as string;
+    if (!id) return;
+
+    await supabaseServer.from("school_notices").delete().eq('id', id);
+    revalidatePath('/ecole');
   }
 
   return (
@@ -74,13 +83,12 @@ export default async function EcolePage() {
           </p>
         </header>
 
-        {/* Grille principale en 3 colonnes : 2 pour le contenu, 1 pour le formulaire et les liens */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           
-          {/* Colonne de gauche (2 colonnes de large) : Événements d'un côté, Infos générales de l'autre */}
+          {/* Colonne de gauche : Événements & Infos Générales */}
           <div className="lg:col-span-2 space-y-8">
             
-            {/* Section 1 : Événements & Sorties */}
+            {/* Section Événements */}
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b pb-2">
                 <h2 className="text-base font-bold text-gray-800 flex items-center gap-2">
@@ -94,20 +102,7 @@ export default async function EcolePage() {
               <div className="space-y-3">
                 {eventsList.length > 0 ? (
                   eventsList.map((notice) => (
-                    <div 
-                      key={notice.id} 
-                      className="p-4 border rounded-xl space-y-2 shadow-sm bg-amber-50/60 border-amber-200 text-amber-900"
-                    >
-                      <div className="flex justify-between items-start gap-2">
-                        <h3 className="font-bold text-sm">{notice.title}</h3>
-                        {notice.notice_date && (
-                          <span className="text-[11px] bg-white/90 px-2 py-0.5 rounded border shadow-sm whitespace-nowrap font-medium text-gray-600">
-                            📅 {new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-700 leading-relaxed">{notice.content}</p>
-                    </div>
+                    <NoticeCard key={notice.id} notice={notice} isAdminOrBureau={isAdminOrBureau} deleteAction={deleteNotice} />
                   ))
                 ) : (
                   <p className="text-xs text-gray-500 italic bg-white p-4 rounded-xl border">
@@ -117,7 +112,7 @@ export default async function EcolePage() {
               </div>
             </div>
 
-            {/* Section 2 : Informations Générales & Photos */}
+            {/* Section Infos Générales */}
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b pb-2">
                 <h2 className="text-base font-bold text-gray-800 flex items-center gap-2">
@@ -131,22 +126,7 @@ export default async function EcolePage() {
               <div className="space-y-3">
                 {generalInfosList.length > 0 ? (
                   generalInfosList.map((notice) => (
-                    <div 
-                      key={notice.id} 
-                      className={`p-4 border rounded-xl space-y-2 shadow-sm ${
-                        notice.category === 'photo' ? 'bg-blue-50/60 border-blue-200 text-blue-900' : 'bg-white border-purple-100 text-purple-900'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start gap-2">
-                        <h3 className="font-bold text-sm">{notice.title}</h3>
-                        {notice.notice_date && (
-                          <span className="text-[11px] bg-white/90 px-2 py-0.5 rounded border shadow-sm whitespace-nowrap font-medium text-gray-600">
-                            📅 {new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-700 leading-relaxed">{notice.content}</p>
-                    </div>
+                    <NoticeCard key={notice.id} notice={notice} isAdminOrBureau={isAdminOrBureau} deleteAction={deleteNotice} />
                   ))
                 ) : (
                   <p className="text-xs text-gray-500 italic bg-white p-4 rounded-xl border">
@@ -158,98 +138,73 @@ export default async function EcolePage() {
 
           </div>
 
-          {/* Colonne de droite : Liens pratiques (Cantine...) & Formulaire de publication */}
+          {/* Colonne de droite : Liens pratiques & Formulaire */}
           <div className="space-y-6">
             
-            {/* Bloc Liens Utiles / Cantine */}
+            {/* Bloc Liens Pratiques */}
             <div className="bg-white border rounded-xl p-4 shadow-sm space-y-3">
               <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
                 <span>🔗</span> Liens pratiques
               </h3>
               <div className="space-y-2">
-                <a
-                  href="https://www.muizon.fr" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block p-2.5 bg-gray-50 hover:bg-purple-50 border rounded-lg text-xs font-medium text-gray-700 hover:text-purple-700 transition flex items-center justify-between"
-                >
-                  <span>🍽️ Portail Cantine & Périscolaire</span>
-                  <span>↗</span>
-                </a>
-                <a
-                  href="https://www.education.gouv.fr" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block p-2.5 bg-gray-50 hover:bg-purple-50 border rounded-lg text-xs font-medium text-gray-700 hover:text-purple-700 transition flex items-center justify-between"
-                >
-                  <span>📅 Calendrier Scolaire Officiel</span>
-                  <span>↗</span>
-                </a>
+                {linksList && linksList.length > 0 ? (
+                  linksList.map((link: any) => (
+                    <div key={link.id} className="flex items-center justify-between bg-gray-50 hover:bg-purple-50 border rounded-lg px-3 py-2 text-xs transition">
+                      <a href={link.content} target="_blank" rel="noopener noreferrer" className="font-medium text-gray-700 hover:text-purple-700 flex-1 truncate">
+                        🔗 {link.title} ↗
+                      </a>
+                      {isAdminOrBureau && (
+                        <form action={deleteNotice}>
+                          <input type="hidden" name="id" value={link.id} />
+                          <button type="submit" className="text-red-500 hover:text-red-700 ml-2 font-bold cursor-pointer" title="Supprimer">
+                            ✕
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400 italic">Aucun lien enregistré.</p>
+                )}
               </div>
             </div>
 
-            {/* Formulaire d'ajout (Réservé admin / bureau) */}
+            {/* Formulaire de publication (Annonces et Liens) */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                <span>✍️</span> Publier une info
+                <span>✍</span> Publier une info ou un lien
               </h3>
 
               {isAdminOrBureau ? (
                 <form action={addSchoolNotice} className="bg-white border rounded-xl p-4 shadow-sm space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Titre de l'annonce</label>
-                    <input
-                      type="text"
-                      name="title"
-                      required
-                      placeholder="Ex: Sortie au théâtre..."
-                      className="w-full p-2 border rounded-md text-xs text-gray-900"
-                    />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Titre / Nom du lien</label>
+                    <input type="text" name="title" required placeholder="Ex: Portail Cantine..." className="w-full p-2 border rounded-md text-xs text-gray-900" />
                   </div>
-
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Catégorie</label>
-                    <select
-                      name="category"
-                      className="w-full p-2 border rounded-md text-xs bg-white text-gray-900"
-                    >
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Type d'élément</label>
+                    <select name="category" className="w-full p-2 border rounded-md text-xs bg-white text-gray-900">
                       <option value="info">Information générale</option>
                       <option value="photo">Photo / Souvenir</option>
                       <option value="trip">Événement / Sortie / Voyage</option>
+                      <option value="link">Lien pratique (URL)</option>
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Date affichée</label>
-                    <input
-                      type="date"
-                      name="notice_date"
-                      defaultValue={new Date().toISOString().split('T')[0]}
-                      className="w-full p-2 border rounded-md text-xs text-gray-900"
-                    />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Date affichée (ou URL si lien)</label>
+                    <input type="date" name="notice_date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-2 border rounded-md text-xs text-gray-900" />
                   </div>
-
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Contenu</label>
-                    <textarea
-                      name="content"
-                      rows={3}
-                      required
-                      placeholder="Détails de l'information..."
-                      className="w-full p-2 border rounded-md text-xs text-gray-900"
-                    />
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Contenu (ou Lien https://... si lien)</label>
+                    <textarea name="content" rows={3} placeholder="Détails ou URL du lien..." className="w-full p-2 border rounded-md text-xs text-gray-900" />
                   </div>
-
-                  <button
-                    type="submit"
-                    className="w-full bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold py-2 rounded-md transition cursor-pointer"
-                  >
-                    + Publier l'annonce
+                  <button type="submit" className="w-full bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold py-2 rounded-md transition cursor-pointer">
+                    + Publier
                   </button>
                 </form>
               ) : (
                 <div className="bg-gray-50 border rounded-xl p-4 text-xs text-gray-500 italic">
-                  * La publication d'informations scolaires est réservée aux membres de l'équipe et de l'administration.
+                  * Réservé aux membres de l'administration.
                 </div>
               )}
             </div>
@@ -259,6 +214,38 @@ export default async function EcolePage() {
         </div>
 
       </div>
+    </div>
+  );
+}
+
+// Composant carte avec bouton supprimer
+function NoticeCard({ notice, isAdminOrBureau, deleteAction }: { notice: any; isAdminOrBureau: boolean; deleteAction: any }) {
+  return (
+    <div className={`p-4 border rounded-xl space-y-2 shadow-sm ${
+      notice.category === 'photo' ? 'bg-blue-50/60 border-blue-200 text-blue-900' :
+      notice.category === 'trip' ? 'bg-amber-50/60 border-amber-200 text-amber-900' :
+      'bg-white border-purple-100 text-purple-900'
+    }`}>
+      <div className="flex justify-between items-start gap-2">
+        <h3 className="font-bold text-sm">{notice.title}</h3>
+        {notice.notice_date && (
+          <span className="text-[11px] bg-white/95 px-2 py-0.5 rounded border shadow-sm whitespace-nowrap font-medium text-gray-600">
+            📅 {new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-gray-700 leading-relaxed">{notice.content}</p>
+
+      {isAdminOrBureau && (
+        <div className="pt-2 border-t border-black/10 flex items-center justify-end gap-3 text-xs">
+          <form action={deleteAction} onSubmit={(e) => { if(!confirm("Voulez-vous supprimer cet élément ?")) e.preventDefault(); }}>
+            <input type="hidden" name="id" value={notice.id} />
+            <button type="submit" className="text-red-600 hover:underline font-semibold cursor-pointer">
+              🗑 Supprimer
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
