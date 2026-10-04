@@ -11,15 +11,21 @@ export function parseWhatsAppExport(fileContent: string) {
   let shoutCount = 0 // Messages entièrement en majuscules
 
   const userMessageCount: { [key: string]: number } = {}
-  const userAperoCount: { [key: string]: number } = {}
   const userEmojiCount: { [key: string]: number } = {}
+  const aperoWordCount: { [key: string]: number } = {
+    'apéro / apero': 0,
+    'bière / biere': 0,
+    'verre / tournée': 0,
+    'pinard / vin': 0,
+    'pastis': 0
+  }
   const emojiCountMap: { [key: string]: number } = {}
   
   let longestMessage = { author: 'Personne', text: '', length: 0 }
 
   // Regex classique pour les exports WhatsApp
   const regexWhatsApp = /^\[?(\d{2}\/\d{2}\/\d{2,4}),?\s*(\d{2}:\d{2})(?::\d{2})?\]?\s*([^:-]+)[:|-]\s*(.*)$/
- const emojiRegex = /[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}]/gu;
+  const emojiRegex = /[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}]/gu;
 
   for (const line of lines) {
     const match = line.match(regexWhatsApp)
@@ -43,28 +49,44 @@ export function parseWhatsAppExport(fileContent: string) {
         morningMessagesCount++
       }
 
-      // 3. Comptage "Apéro" / "Bière" etc.
-      if (['apéro', 'apero', 'bière', 'biere', 'pastis', 'vin'].some(word => content.includes(word))) {
+      // 3. Comptage "Apéro" et variantes
+      if (content.includes('apéro') || content.includes('apero')) {
         aperoCount++
-        userAperoCount[author] = (userAperoCount[author] || 0) + 1
+        aperoWordCount['apéro / apero'] = (aperoWordCount['apéro / apero'] || 0) + 1
+      }
+      if (content.includes('bière') || content.includes('biere')) {
+        aperoCount++
+        aperoWordCount['bière / biere'] = (aperoWordCount['bière / biere'] || 0) + 1
+      }
+      if (content.includes('verre') || content.includes('tournée') || content.includes('tournee')) {
+        aperoCount++
+        aperoWordCount['verre / tournée'] = (aperoWordCount['verre / tournée'] || 0) + 1
+      }
+      if (content.includes('pinard') || content.includes('vin')) {
+        aperoCount++
+        aperoWordCount['pinard / vin'] = (aperoWordCount['pinard / vin'] || 0) + 1
+      }
+      if (content.includes('pastis')) {
+        aperoCount++
+        aperoWordCount['pastis'] = (aperoWordCount['pastis'] || 0) + 1
       }
 
-      // 4. Comptage du mot "cité"
-      if (content.includes('cité') || content.includes('cite')) {
+      // 4. Comptage des mentions de l'école (ex: nom de l'école ou mot clé)
+      if (content.includes('cité') || content.includes('cite') || content.includes('ecole') || content.includes('école')) {
         citeCount++
       }
 
-      // 5. Questions en série
+      // 5. Questions
       if (rawContent.includes('?')) {
         questionCount++
       }
 
-      // 6. Messages en majuscules (s'il y a plus de 5 caractères et que le texte est en uppercase)
+      // 6. Messages en majuscules
       if (rawContent.length > 5 && rawContent === rawContent.toUpperCase() && /[A-Z]/.test(rawContent)) {
         shoutCount++
       }
 
-      // 7. Le pavé d'or (message le plus long)
+      // 7. Le message le plus long
       if (rawContent.length > longestMessage.length) {
         longestMessage = { author, text: rawContent, length: rawContent.length }
       }
@@ -81,23 +103,31 @@ export function parseWhatsAppExport(fileContent: string) {
     }
   }
 
-  // Trouver le plus gros bavard
-  let topBavard = { name: 'Personne', count: 0 }
-  for (const [author, count] of Object.entries(userMessageCount)) {
-    if (count > topBavard.count) {
-      topBavard = { name: author, count }
-    }
-  }
+  // --- CALCULS DES TOP 3 ---
 
-  // Trouver le roi/reine des emojis
-  let topEmojiUser = { name: 'Personne', count: 0 }
-  for (const [author, count] of Object.entries(userEmojiCount)) {
-    if (count > topEmojiUser.count) {
-      topEmojiUser = { name: author, count }
-    }
-  }
+  // Top 3 des plus gros bavards
+  const topBavardsList = Object.entries(userMessageCount)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([name, count]) => ({ name, count }))
 
-  // Trier les emojis les plus utilisés
+  // Top 3 des rois/reines des emojis
+  const topEmojiUsersList = Object.entries(userEmojiCount)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([name, count]) => ({ name, count }))
+
+  // Top 3 des mots apéro / variantes
+  const topAperoWordsList = Object.entries(aperoWordCount)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([keyword, count]) => ({ keyword, count }))
+
+  // Compatibilité rétroactive pour les anciens affichages
+  const topBavard = topBavardsList[0] || { name: 'Personne', count: 0 }
+  const topEmojiUser = topEmojiUsersList[0] || { name: 'Personne', count: 0 }
+
+  // Trier les emojis les plus utilisés globalement
   const topEmojis = Object.entries(emojiCountMap)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
@@ -113,6 +143,9 @@ export function parseWhatsAppExport(fileContent: string) {
     shoutCount,
     topBavard,
     topEmojiUser,
+    topBavardsList,
+    topEmojiUsersList,
+    topAperoWordsList,
     longestMessage,
     topEmojis,
   }

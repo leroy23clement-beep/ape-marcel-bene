@@ -22,7 +22,6 @@ export default function BureauPage() {
       }
       setUser(user)
 
-      // Charger le profil
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -30,7 +29,6 @@ export default function BureauPage() {
         .single()
       setProfile(profileData)
 
-      // Charger les statistiques WhatsApp stockées de manière robuste
       const { data: statsData } = await supabase
         .from('whatsapp_stats')
         .select('*')
@@ -50,12 +48,10 @@ export default function BureauPage() {
   if (loading) return null
   if (!user) return null
 
-  // Liste des rôles ayant accès à l'Espace Bureau
   const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
   const userRole = profile?.role ? profile.role.toLowerCase() : 'parent'
   const isBureau = allowedBureauRoles.includes(userRole)
 
-  // Rôles stricts autorisés à envoyer des notifications push
   const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
   const canSendNotifications = notificationAllowedRoles.includes(userRole)
 
@@ -82,8 +78,6 @@ export default function BureauPage() {
 
             {/* Grille des outils du bureau */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* Carte Gestion de la Trésorerie */}
               <Link 
                 href="/bureau/tresorerie"
                 className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer group"
@@ -97,7 +91,6 @@ export default function BureauPage() {
                 </p>
               </Link>
 
-              {/* Carte Suivi des tâches */}
               <Link 
                 href="/bureau/taches"
                 className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer"
@@ -111,7 +104,6 @@ export default function BureauPage() {
                 </p>
               </Link>
 
-              {/* Carte Documents & PV */}
               <Link 
                 href="/bureau/documents"
                 className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer"
@@ -125,7 +117,6 @@ export default function BureauPage() {
                 </p>
               </Link>
 
-              {/* Carte Calendrier des réunions */}
               <Link 
                 href="/bureau/calendar"
                 className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer"
@@ -139,7 +130,6 @@ export default function BureauPage() {
                 </p>
               </Link>
 
-              {/* Carte Gestion du Trombinoscope */}
               <Link 
                 href="/bureau/team"
                 className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer"
@@ -153,7 +143,6 @@ export default function BureauPage() {
                 </p>
               </Link>
 
-              {/* Carte Module d'import WhatsApp (Admin) */}
               <Link 
                 href="/admin/whatsapp"
                 className="block bg-purple-50 border border-purple-200 rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer group"
@@ -166,17 +155,17 @@ export default function BureauPage() {
                   Importer un nouvel export `.txt` pour mettre à jour et cumuler les statistiques du bureau.
                 </p>
               </Link>
-
             </div>
 
-            {/* Widget des Statistiques WhatsApp cumulées sur la page Bureau */}
-            <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
+            {/* Widget des Statistiques WhatsApp cumulées (Top 3 et Indicateurs) */}
+            <div className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
               <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 <span>📈</span> Le Baromètre WhatsApp du Bureau (Cumulé)
               </h2>
 
               {whatsappStats ? (
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* Chiffres clés */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-center">
                       <p className="text-[10px] text-purple-600 font-bold uppercase">Messages totaux</p>
@@ -187,7 +176,7 @@ export default function BureauPage() {
                       <p className="text-xl font-extrabold text-amber-900 mt-0.5">{whatsappStats.aperoCount}</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-center">
-                      <p className="text-[10px] text-blue-600 font-bold uppercase">📍 Mot "Cité"</p>
+                      <p className="text-[10px] text-blue-600 font-bold uppercase">🏫 Mentions de l'école</p>
                       <p className="text-xl font-extrabold text-blue-900 mt-0.5">{whatsappStats.citeCount}</p>
                     </div>
                     <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center">
@@ -196,16 +185,60 @@ export default function BureauPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    <div className="bg-gray-50 p-3 rounded-xl border flex justify-between items-center">
-                      <span className="font-bold text-gray-700">🏆 Plus gros bavard :</span>
-                      <span className="font-extrabold text-purple-800">{whatsappStats.topBavard?.name} ({whatsappStats.topBavard?.count} msgs)</span>
+                  {/* Top 3 : Bavards & Emojis */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Top 3 Bavards */}
+                    <div className="bg-gray-50 p-4 rounded-xl border space-y-2">
+                      <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🏆</span> Top 3 des plus gros bavards
+                      </h3>
+                      <div className="space-y-1.5">
+                        {whatsappStats.topBavardsList?.map((user: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
+                            <span className="font-semibold text-gray-800">{index + 1}. {user.name}</span>
+                            <span className="font-extrabold text-purple-700">{user.count} msgs</span>
+                          </div>
+                        )) || (
+                          <p className="text-xs text-gray-500 italic">Données indisponibles</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="bg-gray-50 p-3 rounded-xl border flex justify-between items-center">
-                      <span className="font-bold text-gray-700">👑 Roi/Reine des emojis :</span>
-                      <span className="font-extrabold text-purple-800">{whatsappStats.topEmojiUser?.name} ({whatsappStats.topEmojiUser?.count} emojis)</span>
+
+                    {/* Top 3 Emojis */}
+                    <div className="bg-gray-50 p-4 rounded-xl border space-y-2">
+                      <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>👑</span> Top 3 Rois/Reines des Emojis
+                      </h3>
+                      <div className="space-y-1.5">
+                        {whatsappStats.topEmojiUsersList?.map((user: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
+                            <span className="font-semibold text-gray-800">{index + 1}. {user.name}</span>
+                            <span className="font-extrabold text-purple-700">{user.count} emojis</span>
+                          </div>
+                        )) || (
+                          <p className="text-xs text-gray-500 italic">Données indisponibles</p>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Top 3 Variantes du mot Apéro */}
+                  <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 space-y-2">
+                    <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🍻</span> Top 3 des mots "Apéro" & Variantes (apéro, bière, verre, pinard...)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      {whatsappStats.topAperoWordsList?.map((word: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-lg border border-amber-200">
+                          <span className="font-semibold text-gray-800 capitalize">"{word.keyword}"</span>
+                          <span className="font-extrabold text-amber-800">{word.count} fois</span>
+                        </div>
+                      )) || (
+                        <p className="text-xs text-gray-500 italic col-span-3">Aucune variante détectée</p>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               ) : (
                 <p className="text-xs text-gray-500 italic">
@@ -214,7 +247,7 @@ export default function BureauPage() {
               )}
             </div>
 
-            {/* Section Notifications Push (Réservée Admin, Trésorier, Secrétaire) */}
+            {/* Section Notifications Push */}
             {canSendNotifications ? (
               <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4 pt-6 mt-6 border-t">
                 <div>
