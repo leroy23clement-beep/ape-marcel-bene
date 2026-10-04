@@ -55,24 +55,57 @@ export default function BureauPage() {
   const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
   const canSendNotifications = notificationAllowedRoles.includes(userRole)
 
-  // Fonction utilitaire sécurisée pour transformer n'importe quel format en Top 3 exploitable
-  const getTopList = (listData: any) => {
-    if (!listData) return []
-    // Si c'est déjà un tableau
-    if (Array.isArray(listData)) return listData.slice(0, 3)
-    // Si c'est un objet (ex: dictionnaire { Nom: count })
-    if (typeof listData === 'object') {
-      return Object.entries(listData)
-        .map(([name, count]) => ({ name, count }))
-        .sort((a: any, b: any) => b.count - a.count)
+  // Fonction de récupération blindée pour parser n'importe quelle structure de données Supabase
+  const extractTopList = (sourceData: any, possibleKeys: string[]) => {
+    if (!sourceData) return []
+
+    // 1. Chercher si l'une des clés existe et contient un tableau ou un objet
+    let target = null
+    for (const key of possibleKeys) {
+      if (sourceData[key]) {
+        target = sourceData[key]
+        break
+      }
+    }
+
+    // Si rien trouvé, on prend la source brute elle-même si c'est un objet
+    if (!target && typeof sourceData === 'object') {
+      target = sourceData
+    }
+
+    // 2. Si c'est un tableau, on le trie et on prend le top 3
+    if (Array.isArray(target)) {
+      return target
+        .map((item: any) => ({
+          name: item.name || item.nom || item.sender || item.author || item.pseudo || item.keyword || item.word || 'Inconnu',
+          count: item.count !== undefined ? item.count : (item.messages || item.emojis || 0)
+        }))
+        .sort((a, b) => b.count - a.count)
         .slice(0, 3)
     }
+
+    // 3. Si c'est un objet (dictionnaire { Nom: score })
+    if (target && typeof target === 'object') {
+      const excludedKeys = ['total', 'count', 'totalMessages', 'aperoCount', 'citeCount', 'questionCount', 'id', 'created_at']
+      const entries = Object.entries(target).filter(([key]) => !excludedKeys.includes(key))
+
+      if (entries.length > 0) {
+        return entries
+          .map(([name, count]) => ({
+            name,
+            count: typeof count === 'number' ? count : (Number(count) || 0)
+          }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 3)
+      }
+    }
+
     return []
   }
 
-  const bavardsList = getTopList(whatsappStats?.topBavardsList || whatsappStats?.bavards || whatsappStats?.topBavards)
-  const emojiList = getTopList(whatsappStats?.topEmojiUsersList || whatsappStats?.emojiUsers || whatsappStats?.topEmojis)
-  const aperoWordsList = getTopList(whatsappStats?.topAperoWordsList || whatsappStats?.aperoWords || whatsappStats?.motsApero)
+  const bavardsList = extractTopList(whatsappStats, ['topBavardsList', 'bavards', 'topBavards', 'top_bavards', 'messagesPerUser'])
+  const emojiList = extractTopList(whatsappStats, ['topEmojiUsersList', 'emojiUsers', 'topEmojis', 'top_emojis', 'emojisPerUser'])
+  const aperoWordsList = extractTopList(whatsappStats, ['topAperoWordsList', 'aperoWords', 'motsApero', 'top_apero_words'])
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -213,16 +246,12 @@ export default function BureauPage() {
                       </h3>
                       <div className="space-y-1.5">
                         {bavardsList.length > 0 ? (
-                          bavardsList.map((item: any, index: number) => {
-                            const displayName = item.name || item.nom || item.sender || item.author || item.pseudo || `Utilisateur ${index + 1}`
-                            const displayCount = item.count !== undefined ? item.count : (item.messages || 0)
-                            return (
-                              <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
-                                <span className="font-semibold text-gray-800">{index + 1}. {displayName}</span>
-                                <span className="font-extrabold text-purple-700">{displayCount} msgs</span>
-                              </div>
-                            )
-                          })
+                          bavardsList.map((item: any, index: number) => (
+                            <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
+                              <span className="font-semibold text-gray-800">{index + 1}. {item.name}</span>
+                              <span className="font-extrabold text-purple-700">{item.count} msgs</span>
+                            </div>
+                          ))
                         ) : (
                           <p className="text-xs text-gray-500 italic">Aucune donnée de classement disponible</p>
                         )}
@@ -236,16 +265,12 @@ export default function BureauPage() {
                       </h3>
                       <div className="space-y-1.5">
                         {emojiList.length > 0 ? (
-                          emojiList.map((item: any, index: number) => {
-                            const displayName = item.name || item.nom || item.sender || item.author || item.pseudo || `Utilisateur ${index + 1}`
-                            const displayCount = item.count !== undefined ? item.count : (item.emojis || 0)
-                            return (
-                              <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
-                                <span className="font-semibold text-gray-800">{index + 1}. {displayName}</span>
-                                <span className="font-extrabold text-purple-700">{displayCount} emojis</span>
-                              </div>
-                            )
-                          })
+                          emojiList.map((item: any, index: number) => (
+                            <div key={index} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border">
+                              <span className="font-semibold text-gray-800">{index + 1}. {item.name}</span>
+                              <span className="font-extrabold text-purple-700">{item.count} emojis</span>
+                            </div>
+                          ))
                         ) : (
                           <p className="text-xs text-gray-500 italic">Aucune donnée de classement disponible</p>
                         )}
@@ -262,7 +287,7 @@ export default function BureauPage() {
                       {aperoWordsList.length > 0 ? (
                         aperoWordsList.map((word: any, index: number) => (
                           <div key={index} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-lg border border-amber-200">
-                            <span className="font-semibold text-gray-800 capitalize">"{word.keyword || word.word || word.name}"</span>
+                            <span className="font-semibold text-gray-800 capitalize">"{word.name}"</span>
                             <span className="font-extrabold text-amber-800">{word.count} fois</span>
                           </div>
                         ))
