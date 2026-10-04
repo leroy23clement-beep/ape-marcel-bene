@@ -30,16 +30,16 @@ export default function BureauPage() {
         .single()
       setProfile(profileData)
 
-      // Charger les statistiques WhatsApp stockées
+      // Charger les statistiques WhatsApp stockées de manière robuste
       const { data: statsData } = await supabase
         .from('whatsapp_stats')
         .select('*')
         .order('id', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (statsData) {
-        setWhatsappStats(statsData.stats_json)
+        setWhatsappStats(statsData.stats_json || statsData)
       }
 
       setLoading(false)
