@@ -234,7 +234,17 @@ export default function EventsPage() {
                 </div>
               )}
 
-              <div className="pt-4 border-t flex justify-end">
+              {/* Bouton de modification admin dans la modale */}
+              <div className="pt-4 border-t flex justify-between items-center">
+                {profile?.role === 'admin' ? (
+                  <Link
+                    href={`/admin/events/${selectedEvent.id}/edit`}
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
+                  >
+                    ✏️ Modifier cet événement
+                  </Link>
+                ) : <span />}
+
                 <button
                   onClick={() => setSelectedEvent(null)}
                   className="bg-gray-900 text-white text-xs font-semibold px-5 py-2.5 rounded-xl hover:bg-gray-800 transition cursor-pointer"
