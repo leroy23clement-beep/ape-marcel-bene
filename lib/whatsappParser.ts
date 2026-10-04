@@ -17,20 +17,26 @@ export function parseWhatsAppExport(fileContent: string) {
     'pastis': 0
   }
 
-  // Regex ultra-robuste adaptée à tous les exports WhatsApp (iOS et Android)
-  const regexWhatsApp = /^(?:\[?[\d./\s,-]+\]?|[\d./\s,-]+ -)?\s*([^:–-]+)[:–-]\s*(.*)$/
+  // Regex ciblée : Ignore la date/heure au début et capture ce qui se trouve entre le tiret/espace et les deux-points ":" de l'auteur
+  const regexWhatsApp = /(?:\[?\d{2}\/\d{2}\/\d{2,4},?\s*\d{2}:\d{2}(?::\d{2})?\]?)\s*(?:[-–]\s*)?([^:]+):\s*(.*)$/
   const emojiRegex = /[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}]/gu;
 
   for (const line of lines) {
-    // On cherche une ligne qui contient un séparateur d'auteur (ex: "Nom: message" ou "Nom – message")
     const match = line.match(regexWhatsApp)
     if (match && match[1] && match[2]) {
       const author = match[1].trim()
       const content = match[2].toLowerCase()
       const rawContent = match[2]
 
-      // Ignorer les messages système (ex: "Les messages et les appels sont chiffrés...")
-      if (author.length > 30 || author.toLowerCase().includes('http') || author.toLowerCase().includes('sécurisés')) {
+      // Filtrer les messages système ou les faux auteurs
+      if (
+        !author || 
+        author.length > 30 || 
+        author.includes('/') || 
+        author.includes(':') || 
+        author.toLowerCase().includes('code') ||
+        author.toLowerCase().includes('chiffrés')
+      ) {
         continue
       }
 
