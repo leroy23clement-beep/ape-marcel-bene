@@ -125,8 +125,65 @@ export default async function EcolePage() {
 
               <div className="space-y-3">
                 {eventsList.length > 0 ? (
-                  eventsList.map((notice) => (
-                    <NoticeCard key={notice.id} notice={notice} isAdminOrBureau={isAdminOrBureau} updateAction={updateNotice} deleteAction={deleteNotice} />
+                  eventsList.map((notice: any) => (
+                    <div key={notice.id} className="p-4 border rounded-xl space-y-2 shadow-sm bg-amber-50/60 border-amber-200 text-amber-900">
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className="font-bold text-sm">{notice.title}</h3>
+                        {notice.notice_date && (
+                          <span className="text-[11px] bg-white/95 px-2 py-0.5 rounded border shadow-sm whitespace-nowrap font-medium text-gray-600">
+                            📅 {new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-700 leading-relaxed">{notice.content}</p>
+
+                      {isAdminOrBureau && (
+                        <div className="pt-2 border-t border-black/10 space-y-2 text-xs">
+                          <details className="group">
+                            <summary className="cursor-pointer text-purple-700 font-semibold hover:underline inline-flex items-center gap-1">
+                              ✏️ Modifier
+                            </summary>
+                            <form action={updateNotice} className="mt-3 p-3 bg-purple-50/80 border border-purple-200 rounded-lg space-y-2.5">
+                              <input type="hidden" name="id" value={notice.id} />
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Titre</label>
+                                <input type="text" name="title" defaultValue={notice.title} required className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Catégorie</label>
+                                <select name="category" defaultValue={notice.category} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900">
+                                  <option value="info">Information générale</option>
+                                  <option value="photo">Photo / Souvenir</option>
+                                  <option value="trip">Événement / Sortie / Voyage</option>
+                                  <option value="link">Lien pratique (URL)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Date</label>
+                                <input type="date" name="notice_date" defaultValue={notice.notice_date ? notice.notice_date.split('T')[0] : ''} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Contenu</label>
+                                <textarea name="content" rows={2} defaultValue={notice.content} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                              </div>
+                              <div className="flex justify-end gap-2 pt-1">
+                                <button type="submit" className="bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-purple-800 transition cursor-pointer">
+                                  Mettre à jour
+                                </button>
+                              </div>
+                            </form>
+                          </details>
+                          <div className="flex justify-end pt-1 border-t border-black/5">
+                            <form action={deleteNotice} onSubmit={(e) => { if(!confirm("Voulez-vous supprimer cet élément ?")) e.preventDefault(); }}>
+                              <input type="hidden" name="id" value={notice.id} />
+                              <button type="submit" className="text-red-600 hover:underline font-semibold cursor-pointer">
+                                🗑 Supprimer
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ))
                 ) : (
                   <p className="text-xs text-gray-500 italic bg-white p-4 rounded-xl border">
@@ -149,8 +206,67 @@ export default async function EcolePage() {
 
               <div className="space-y-3">
                 {generalInfosList.length > 0 ? (
-                  generalInfosList.map((notice) => (
-                    <NoticeCard key={notice.id} notice={notice} isAdminOrBureau={isAdminOrBureau} updateAction={updateNotice} deleteAction={deleteNotice} />
+                  generalInfosList.map((notice: any) => (
+                    <div key={notice.id} className={`p-4 border rounded-xl space-y-2 shadow-sm ${
+                      notice.category === 'photo' ? 'bg-blue-50/60 border-blue-200 text-blue-900' : 'bg-white border-purple-100 text-purple-900'
+                    }`}>
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className="font-bold text-sm">{notice.title}</h3>
+                        {notice.notice_date && (
+                          <span className="text-[11px] bg-white/95 px-2 py-0.5 rounded border shadow-sm whitespace-nowrap font-medium text-gray-600">
+                            📅 {new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-700 leading-relaxed">{notice.content}</p>
+
+                      {isAdminOrBureau && (
+                        <div className="pt-2 border-t border-black/10 space-y-2 text-xs">
+                          <details className="group">
+                            <summary className="cursor-pointer text-purple-700 font-semibold hover:underline inline-flex items-center gap-1">
+                              ✏️ Modifier
+                            </summary>
+                            <form action={updateNotice} className="mt-3 p-3 bg-purple-50/80 border border-purple-200 rounded-lg space-y-2.5">
+                              <input type="hidden" name="id" value={notice.id} />
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Titre</label>
+                                <input type="text" name="title" defaultValue={notice.title} required className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Catégorie</label>
+                                <select name="category" defaultValue={notice.category} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900">
+                                  <option value="info">Information générale</option>
+                                  <option value="photo">Photo / Souvenir</option>
+                                  <option value="trip">Événement / Sortie / Voyage</option>
+                                  <option value="link">Lien pratique (URL)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Date</label>
+                                <input type="date" name="notice_date" defaultValue={notice.notice_date ? notice.notice_date.split('T')[0] : ''} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Contenu</label>
+                                <textarea name="content" rows={2} defaultValue={notice.content} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
+                              </div>
+                              <div className="flex justify-end gap-2 pt-1">
+                                <button type="submit" className="bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-purple-800 transition cursor-pointer">
+                                  Mettre à jour
+                                </button>
+                              </div>
+                            </form>
+                          </details>
+                          <div className="flex justify-end pt-1 border-t border-black/5">
+                            <form action={deleteNotice} onSubmit={(e) => { if(!confirm("Voulez-vous supprimer cet élément ?")) e.preventDefault(); }}>
+                              <input type="hidden" name="id" value={notice.id} />
+                              <button type="submit" className="text-red-600 hover:underline font-semibold cursor-pointer">
+                                🗑 Supprimer
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ))
                 ) : (
                   <p className="text-xs text-gray-500 italic bg-white p-4 rounded-xl border">
@@ -178,7 +294,7 @@ export default async function EcolePage() {
                         🔗 {link.title} ↗
                       </a>
                       {isAdminOrBureau && (
-                        <form action={deleteAction}>
+                        <form action={deleteNotice}>
                           <input type="hidden" name="id" value={link.id} />
                           <button type="submit" className="text-red-500 hover:text-red-700 ml-2 font-bold cursor-pointer" title="Supprimer">
                             ✕
@@ -238,80 +354,6 @@ export default async function EcolePage() {
         </div>
 
       </div>
-    </div>
-  );
-}
-
-// Composant carte avec options de modification et suppression intégrées
-function NoticeCard({ notice, isAdminOrBureau, updateAction, deleteAction }: { notice: any; isAdminOrBureau: boolean; updateAction: any; deleteAction: any }) {
-  return (
-    <div className={`p-4 border rounded-xl space-y-2 shadow-sm ${
-      notice.category === 'photo' ? 'bg-blue-50/60 border-blue-200 text-blue-900' :
-      notice.category === 'trip' ? 'bg-amber-50/60 border-amber-200 text-amber-900' :
-      'bg-white border-purple-100 text-purple-900'
-    }`}>
-      <div className="flex justify-between items-start gap-2">
-        <h3 className="font-bold text-sm">{notice.title}</h3>
-        {notice.notice_date && (
-          <span className="text-[11px] bg-white/95 px-2 py-0.5 rounded border shadow-sm whitespace-nowrap font-medium text-gray-600">
-            📅 {new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </span>
-        )}
-      </div>
-      <p className="text-xs text-gray-700 leading-relaxed">{notice.content}</p>
-
-      {isAdminOrBureau && (
-        <div className="pt-2 border-t border-black/10 space-y-2 text-xs">
-          
-          {/* Section Modifier (Accordéon natif) */}
-          <details className="group">
-            <summary className="cursor-pointer text-purple-700 font-semibold hover:underline inline-flex items-center gap-1">
-              ✏️ Modifier
-            </summary>
-            
-            <form action={updateAction} className="mt-3 p-3 bg-purple-50/80 border border-purple-200 rounded-lg space-y-2.5">
-              <input type="hidden" name="id" value={notice.id} />
-              <div>
-                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Titre</label>
-                <input type="text" name="title" defaultValue={notice.title} required className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Catégorie</label>
-                <select name="category" defaultValue={notice.category} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900">
-                  <option value="info">Information générale</option>
-                  <option value="photo">Photo / Souvenir</option>
-                  <option value="trip">Événement / Sortie / Voyage</option>
-                  <option value="link">Lien pratique (URL)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Date</label>
-                <input type="date" name="notice_date" defaultValue={notice.notice_date ? notice.notice_date.split('T')[0] : ''} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Contenu</label>
-                <textarea name="content" rows={2} defaultValue={notice.content} className="w-full p-1.5 border rounded text-xs bg-white text-gray-900" />
-              </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <button type="submit" className="bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-purple-800 transition cursor-pointer">
-                  Mettre à jour
-                </button>
-              </div>
-            </form>
-          </details>
-
-          {/* Bouton Supprimer */}
-          <div className="flex justify-end pt-1 border-t border-black/5">
-            <form action={deleteAction} onSubmit={(e) => { if(!confirm("Voulez-vous supprimer cet élément ?")) e.preventDefault(); }}>
-              <input type="hidden" name="id" value={notice.id} />
-              <button type="submit" className="text-red-600 hover:underline font-semibold cursor-pointer">
-                🗑 Supprimer
-              </button>
-            </form>
-          </div>
-
-        </div>
-      )}
     </div>
   );
 }
