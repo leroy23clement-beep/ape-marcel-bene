@@ -39,11 +39,24 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
   return (
     <nav className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between h-20 items-center">
           <div className="flex items-center">
-            <Link href="/dashboard" className="flex items-center gap-2 font-bold text-gray-900 text-lg">
-              <img src="/logo.jpg" alt="Logo APE" className="w-8 h-8 object-contain" />
-              <span>APE Marcel Béné</span>
+            <Link href="/dashboard" className="flex items-center gap-3 font-bold text-gray-900 text-lg">
+              <img 
+                src="/logo.jpg" 
+                alt="Logo APE" 
+                className="w-16 h-16 object-contain rounded-lg shadow-sm border border-orange-200" 
+              />
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5 text-base sm:text-lg">
+                  <span>🦇</span>
+                  <span>APE Marcel Béné</span>
+                  <span>🎃</span>
+                </div>
+                <span className="text-[10px] text-orange-600 font-semibold tracking-wide">
+                  Spécial Halloween 👻
+                </span>
+              </div>
             </Link>
           </div>
 
