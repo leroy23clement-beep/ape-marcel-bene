@@ -58,7 +58,8 @@ export default function GalleryDetailPage() {
     const files = Array.from(e.target.files)
     for (const file of files) {
       const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random().toString(36.substring(2)}_${Date.now()}.${fileExt}`
+      // Correction de la parenthèse fermante ici :
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
       const filePath = `${galleryId}/${fileName}`
 
       // Upload dans le bucket Supabase 'event-galleries'
@@ -104,7 +105,7 @@ export default function GalleryDetailPage() {
       <div className="mx-auto max-w-6xl p-6 space-y-6">
         <div className="flex items-center justify-between border-b pb-4">
           <div>
-            <button onClick={() => router.push('/gallery')} className="text-xs text-purple-700 font-semibold hover:underline mb-1 block">
+            <button onClick={() => router.push('/gallery')} className="text-xs text-purple-700 font-semibold hover:underline mb-1 block cursor-pointer">
               ← Retour aux galeries
             </button>
             <h1 className="text-2xl font-bold text-gray-900">{gallery.title}</h1>
@@ -115,7 +116,7 @@ export default function GalleryDetailPage() {
 
           {isAdminOrBureau && (
             <div>
-              <label className={`cursor-pointer bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow transition ${uploading ? 'opacity-50' : ''}`}>
+              <label className={`cursor-pointer bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow transition inline-block ${uploading ? 'opacity-50' : ''}`}>
                 {uploading ? 'Ajout en cours...' : '+ Ajouter des photos'}
                 <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="hidden" disabled={uploading} />
               </label>
