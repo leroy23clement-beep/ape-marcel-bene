@@ -29,7 +29,7 @@ export default function EventsPage() {
         setProfile(profileData)
       }
 
-      // Récupération de tous les événements triés par date[cite: 4]
+      // Récupération de tous les événements triés par date
       const { data: eventsData } = await supabase
         .from('events')
         .select('*')
@@ -40,16 +40,26 @@ export default function EventsPage() {
     loadData()
   }, [])
 
-  // Filtrer les événements selon le mois sélectionné si on est en mode Mois[cite: 4]
+  // Filtrer les événements selon le mois sélectionné si on est en mode Mois
   const filteredEvents = events.filter((ev) => {
     if (viewMode === 'month') {
       return ev.event_date.startsWith(selectedMonth)
     }
-    return true // En mode liste, on affiche tous les événements[cite: 4]
+    return true 
   })
 
+  // Séparation des événements : Passés vs Futurs (par rapport à la date et l'heure actuelles)
+  const now = new Date()
+
+  const futureEvents = filteredEvents.filter((ev) => new Date(ev.event_date) >= now)
+  const pastEvents = filteredEvents.filter((ev) => new Date(ev.event_date) < now)
+
+  // Le tout premier événement futur est "la prochaine manifestation"
+  const nextEvent = futureEvents.length > 0 ? futureEvents[0] : null
+  const upcomingEvents = futureEvents.length > 0 ? futureEvents.slice(1) : []
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-12">
       {user && (
         <Navbar 
           userEmail={user.email} 
@@ -86,7 +96,7 @@ export default function EventsPage() {
               />
             )}
             
-            {/* Boutons de bascule Liste / Mois[cite: 4] */}
+            {/* Boutons de bascule Liste / Mois */}
             <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
               <button
                 onClick={() => setViewMode('list')}
@@ -112,84 +122,195 @@ export default function EventsPage() {
           </div>
         </div>
 
-        {/* Grille de miniatures / cartes d'événements */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredEvents.length > 0 ? (
-            filteredEvents.map((event) => {
-              const eventDate = new Date(event.event_date)
-              const dayNumber = eventDate.toLocaleDateString('fr-FR', { day: 'numeric' })
-              const monthName = eventDate.toLocaleDateString('fr-FR', { month: 'short' }).toUpperCase()
-              const timeString = eventDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        {/* 1. SECTION : LA PROCHAINE MANIFESTATION (MISE EN AVANT) */}
+        {nextEvent && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="bg-purple-700 text-white text-[11px] font-extrabold uppercase px-3 py-1 rounded-full tracking-wider animate-pulse shadow-sm">
+                ⭐ Prochaine manifestation à ne pas louper
+              </span>
+            </div>
 
-              return (
-                <div
-                  key={event.id}
-                  id={`event-${event.id}`}
-                  onClick={() => setSelectedEvent(event)}
-                  className="bg-white rounded-xl border shadow-sm hover:border-purple-500 hover:shadow-md transition cursor-pointer overflow-hidden flex flex-col justify-between group"
-                >
-                  {/* Miniature / Image de l'événement en entier (object-contain) */}
-                  {event.image_url ? (
-                    <div className="h-52 w-full bg-gray-950/5 overflow-hidden relative flex items-center justify-center p-2 border-b">
-                      <img
-                        src={event.image_url}
-                        alt={event.title}
-                        className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-20 bg-purple-900 text-white px-5 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-purple-200">Événement APE</span>
-                      <span className="text-xl">🎉</span>
-                    </div>
+            <div
+              onClick={() => setSelectedEvent(nextEvent)}
+              className="bg-gradient-to-r from-purple-50 via-white to-white rounded-2xl border-2 border-purple-500 shadow-lg hover:shadow-xl transition cursor-pointer overflow-hidden flex flex-col md:flex-row group"
+            >
+              {nextEvent.image_url ? (
+                <div className="md:w-1/2 bg-gray-950/5 overflow-hidden relative flex items-center justify-center p-4 border-b md:border-b-0 md:border-r border-purple-100">
+                  <img
+                    src={nextEvent.image_url}
+                    alt={nextEvent.title}
+                    className="max-h-80 w-full object-contain group-hover:scale-105 transition duration-300 rounded-lg"
+                  />
+                </div>
+              ) : (
+                <div className="md:w-1/2 bg-purple-900 text-white p-8 flex flex-col justify-center items-center text-center">
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-200">Événement APE</span>
+                  <span className="text-4xl my-2">🎉</span>
+                </div>
+              )}
+
+              <div className="p-6 md:p-8 flex-1 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-purple-100 text-purple-800">
+                      {new Date(nextEvent.event_date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+                    <span className="text-xs font-bold text-purple-700">
+                      🕒 {new Date(nextEvent.event_date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+
+                  <h2 className="text-2xl font-extrabold text-gray-900 group-hover:text-purple-700 transition">
+                    {nextEvent.title}
+                  </h2>
+
+                  {nextEvent.location && (
+                    <p className="text-xs font-semibold text-purple-600">
+                      📍 {nextEvent.location}
+                    </p>
                   )}
 
-                  {/* Contenu de la carte */}
-                  <div className="p-5 flex items-start gap-4">
-                    {/* Bloc date à gauche */}
-                    <div className="flex flex-col items-center justify-center bg-purple-50 text-purple-700 border border-purple-100 rounded-lg p-3 min-w-[70px]">
-                      <span className="text-xl font-extrabold">{dayNumber}</span>
-                      <span className="text-[10px] uppercase font-semibold tracking-wider">
-                        {monthName}
-                      </span>
-                    </div>
+                  <p className="text-xs text-gray-600 line-clamp-3 pt-1">
+                    {nextEvent.description}
+                  </p>
+                </div>
 
-                    {/* Infos de l'événement */}
-                    <div className="space-y-1 flex-1">
-                      <div className="flex justify-between items-start">
-                        <h2 className="font-bold text-gray-900 group-hover:text-purple-700 transition text-base">
-                          {event.title}
-                        </h2>
-                        <span className="text-xs text-gray-500 font-medium">
-                          🕒 {timeString}
+                <div className="flex justify-end pt-2">
+                  <span className="text-xs font-bold text-purple-700 group-hover:underline flex items-center gap-1">
+                    Voir les détails et l'affiche 🔍
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. SECTION : LES PROCHAINES MANIFESTATIONS SUIVANTES */}
+        {upcomingEvents.length > 0 && (
+          <div className="space-y-3 pt-4">
+            <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">
+              📅 Événements à venir
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {upcomingEvents.map((event) => {
+                const eventDate = new Date(event.event_date)
+                const dayNumber = eventDate.toLocaleDateString('fr-FR', { day: 'numeric' })
+                const monthName = eventDate.toLocaleDateString('fr-FR', { month: 'short' }).toUpperCase()
+                const timeString = eventDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+                return (
+                  <div
+                    key={event.id}
+                    onClick={() => setSelectedEvent(event)}
+                    className="bg-white rounded-xl border shadow-sm hover:border-purple-400 hover:shadow-md transition cursor-pointer overflow-hidden flex flex-col justify-between group"
+                  >
+                    {event.image_url ? (
+                      <div className="h-48 w-full bg-gray-950/5 overflow-hidden relative flex items-center justify-center p-2 border-b">
+                        <img
+                          src={event.image_url}
+                          alt={event.title}
+                          className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-16 bg-purple-800 text-white px-5 flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-purple-200">Événement</span>
+                        <span>🎉</span>
+                      </div>
+                    )}
+
+                    <div className="p-4 flex items-start gap-4">
+                      <div className="flex flex-col items-center justify-center bg-purple-50 text-purple-700 border border-purple-100 rounded-lg p-2.5 min-w-[65px]">
+                        <span className="text-lg font-extrabold">{dayNumber}</span>
+                        <span className="text-[10px] uppercase font-semibold tracking-wider">
+                          {monthName}
                         </span>
                       </div>
-                      
-                      <p className="text-xs text-gray-600 line-clamp-2">
-                        {event.description}
-                      </p>
 
-                      <div className="flex justify-between items-center pt-2">
-                        {event.location ? (
-                          <p className="text-xs text-purple-600 font-medium">
-                            📍 {event.location}
-                          </p>
-                        ) : <span />}
-                        <span className="text-xs font-semibold text-purple-700 group-hover:underline">
-                          Voir l'affiche 🔍
-                        </span>
+                      <div className="space-y-1 flex-1">
+                        <div className="flex justify-between items-start">
+                          <h3 className="font-bold text-gray-900 group-hover:text-purple-700 transition text-sm">
+                            {event.title}
+                          </h3>
+                          <span className="text-[11px] text-gray-500 font-medium">
+                            {timeString}
+                          </span>
+                        </div>
+                        
+                        <p className="text-xs text-gray-600 line-clamp-2">
+                          {event.description}
+                        </p>
+
+                        <div className="flex justify-between items-center pt-2">
+                          {event.location ? (
+                            <p className="text-[11px] text-purple-600 font-medium">
+                              📍 {event.location}
+                            </p>
+                          ) : <span />}
+                          <span className="text-[11px] font-semibold text-purple-700 group-hover:underline">
+                            Voir l'affiche 🔍
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )
-            })
-          ) : (
-            <div className="bg-white p-8 rounded-xl border text-center text-gray-500 text-xs italic col-span-full">
-              Aucun événement trouvé pour cette période[cite: 4].
+                )
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* 3. SECTION : ÉVÉNEMENTS PASSÉS (PLUS PETITS ET PLUS DISCRETS) */}
+        {pastEvents.length > 0 && (
+          <div className="space-y-3 pt-8 border-t">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+              📜 Événements passés
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {pastEvents.map((event) => {
+                const eventDate = new Date(event.event_date)
+                const dateString = eventDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+
+                return (
+                  <div
+                    key={event.id}
+                    onClick={() => setSelectedEvent(event)}
+                    className="bg-gray-50/80 rounded-lg border border-gray-200 p-3 hover:bg-white hover:border-gray-300 transition cursor-pointer flex items-center gap-3 opacity-75 hover:opacity-100"
+                  >
+                    {event.image_url ? (
+                      <img
+                        src={event.image_url}
+                        alt={event.title}
+                        className="w-12 h-12 object-contain rounded bg-white border shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-sm shrink-0">
+                        📁
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">
+                        {dateString}
+                      </p>
+                      <h4 className="text-xs font-bold text-gray-800 truncate">
+                        {event.title}
+                      </h4>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Message si aucun événement du tout */}
+        {filteredEvents.length === 0 && (
+          <div className="bg-white p-8 rounded-xl border text-center text-gray-500 text-xs italic">
+            Aucun événement trouvé pour cette période.
+          </div>
+        )}
 
       </main>
 
@@ -198,7 +319,6 @@ export default function EventsPage() {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl relative flex flex-col">
             
-            {/* Bouton de fermeture */}
             <button
               onClick={() => setSelectedEvent(null)}
               className="absolute top-4 right-4 bg-gray-100 text-gray-700 hover:bg-gray-200 w-8 h-8 rounded-full flex items-center justify-center font-bold transition z-10 cursor-pointer"
@@ -206,7 +326,6 @@ export default function EventsPage() {
               ✕
             </button>
 
-            {/* Contenu de la modale */}
             <div className="p-6 space-y-4">
               {selectedEvent.image_url && (
                 <div className="w-full bg-gray-950/5 rounded-xl overflow-hidden border flex justify-center p-2">
@@ -234,7 +353,6 @@ export default function EventsPage() {
                 </div>
               )}
 
-              {/* Bouton de modification admin dans la modale pointant vers la page existante avec l'ID */}
               <div className="pt-4 border-t flex justify-between items-center">
                 {profile?.role === 'admin' ? (
                   <Link
