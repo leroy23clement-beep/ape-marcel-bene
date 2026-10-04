@@ -29,10 +29,10 @@ export default function EventsPage() {
         setProfile(profileData)
       }
 
-      // Récupération de tous les événements triés par date
+      // Récupération de tous les événements avec leur galerie associée éventuelle
       const { data: eventsData } = await supabase
         .from('events')
-        .select('*')
+        .select('*, event_galleries(id)')
         .order('event_date', { ascending: true })
 
       if (eventsData) setEvents(eventsData)
@@ -176,8 +176,17 @@ export default function EventsPage() {
                   </p>
                 </div>
 
-                <div className="flex justify-end pt-2">
-                  <span className="text-xs font-bold text-purple-700 group-hover:underline flex items-center gap-1">
+                <div className="flex justify-between items-center pt-2">
+                  {nextEvent.event_galleries && nextEvent.event_galleries.length > 0 ? (
+                    <Link
+                      href={`/gallery/${nextEvent.event_galleries[0].id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg border border-purple-200 transition flex items-center gap-1"
+                    >
+                      📸 Voir la galerie photos
+                    </Link>
+                  ) : <span />}
+                  <span className="text-xs font-bold text-purple-700 group-hover:underline flex items-center gap-1 ml-auto">
                     Voir les détails et l'affiche 🔍
                   </span>
                 </div>
@@ -350,6 +359,18 @@ export default function EventsPage() {
               {selectedEvent.description && (
                 <div className="text-sm text-gray-700 bg-gray-50 p-4 rounded-xl border whitespace-pre-wrap">
                   <p>{selectedEvent.description}</p>
+                </div>
+              )}
+
+              {/* Bouton vers la galerie si elle existe pour cet événement */}
+              {selectedEvent.event_galleries && selectedEvent.event_galleries.length > 0 && (
+                <div className="pt-2">
+                  <Link
+                    href={`/gallery/${selectedEvent.event_galleries[0].id}`}
+                    className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+                  >
+                    📸 Voir la galerie photos de cet événement
+                  </Link>
                 </div>
               )}
 
