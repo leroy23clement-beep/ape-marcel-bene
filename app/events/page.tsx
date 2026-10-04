@@ -234,11 +234,11 @@ export default function EventsPage() {
                 </div>
               )}
 
-              {/* Bouton de modification admin dans la modale */}
+              {/* Bouton de modification admin dans la modale pointant vers la page existante avec l'ID */}
               <div className="pt-4 border-t flex justify-between items-center">
                 {profile?.role === 'admin' ? (
                   <Link
-                    href={`/admin/events/${selectedEvent.id}/edit`}
+                    href={`/admin/events/new?id=${selectedEvent.id}`}
                     className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
                   >
                     ✏️ Modifier cet événement
