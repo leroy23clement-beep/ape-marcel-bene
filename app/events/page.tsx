@@ -112,7 +112,7 @@ export default function EventsPage() {
           </div>
         </div>
 
-        {/* Grille de miniatures / cartes d'événements au lieu de redirections */}
+        {/* Grille de miniatures / cartes d'événements */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredEvents.length > 0 ? (
             filteredEvents.map((event) => {
@@ -128,13 +128,13 @@ export default function EventsPage() {
                   onClick={() => setSelectedEvent(event)}
                   className="bg-white rounded-xl border shadow-sm hover:border-purple-500 hover:shadow-md transition cursor-pointer overflow-hidden flex flex-col justify-between group"
                 >
-                  {/* Miniature / Image de l'événement si elle existe */}
+                  {/* Miniature / Image de l'événement en entier (object-contain) */}
                   {event.image_url ? (
-                    <div className="h-44 w-full bg-gray-100 overflow-hidden relative">
+                    <div className="h-52 w-full bg-gray-950/5 overflow-hidden relative flex items-center justify-center p-2 border-b">
                       <img
                         src={event.image_url}
                         alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        className="w-full h-full object-contain group-hover:scale-105 transition duration-300"
                       />
                     </div>
                   ) : (
@@ -186,7 +186,7 @@ export default function EventsPage() {
             })
           ) : (
             <div className="bg-white p-8 rounded-xl border text-center text-gray-500 text-xs italic col-span-full">
-              Aucun événement trouvé pour cette période.[cite: 4]
+              Aucun événement trouvé pour cette période[cite: 4].
             </div>
           )}
         </div>
@@ -196,7 +196,7 @@ export default function EventsPage() {
       {/* FENÊTRE MODALE (POPUP) AU CLIC SUR UN ÉVÉNEMENT */}
       {selectedEvent && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative flex flex-col">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl relative flex flex-col">
             
             {/* Bouton de fermeture */}
             <button
@@ -209,11 +209,11 @@ export default function EventsPage() {
             {/* Contenu de la modale */}
             <div className="p-6 space-y-4">
               {selectedEvent.image_url && (
-                <div className="w-full bg-gray-50 rounded-xl overflow-hidden border flex justify-center">
+                <div className="w-full bg-gray-950/5 rounded-xl overflow-hidden border flex justify-center p-2">
                   <img
                     src={selectedEvent.image_url}
                     alt={selectedEvent.title}
-                    className="max-h-[50vh] object-contain"
+                    className="w-full max-h-[65vh] object-contain rounded-lg"
                   />
                 </div>
               )}

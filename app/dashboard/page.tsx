@@ -51,7 +51,7 @@ export default async function DashboardPage() {
   const { data: schoolNotices } = await supabase
     .from("school_notices")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("notice_date", { ascending: false });
 
   // Récupération de toutes les transactions financières réelles
   const { data: transactions } = await supabase
@@ -285,7 +285,7 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* COLONNE 3 : Le coin de l'école (Infos & Rappels Dynamiques) */}
+          {/* COLONNE 3 : Le coin de l'école (Infos & Rappels Dynamiques avec notice_date) */}
           <div className="rounded-xl border bg-white p-5 shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b pb-2">
               <h2 className="font-semibold text-gray-800 text-base flex items-center gap-1.5">
@@ -303,13 +303,20 @@ export default async function DashboardPage() {
                 schoolNotices.map((notice) => (
                   <div 
                     key={notice.id} 
-                    className={`p-3 border rounded-lg space-y-1 ${
+                    className={`p-3 border rounded-lg space-y-1.5 ${
                       notice.category === 'photo' ? 'bg-blue-50/60 border-blue-100 text-blue-900' :
                       notice.category === 'trip' ? 'bg-amber-50/60 border-amber-100 text-amber-900' :
                       'bg-purple-50/60 border-purple-100 text-purple-900'
                     }`}
                   >
-                    <span className="font-bold block">{notice.title}</span>
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="font-bold">{notice.title}</span>
+                      {notice.notice_date && (
+                        <span className="text-[10px] opacity-75 whitespace-nowrap font-medium">
+                          📅 {new Date(notice.notice_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-gray-600">{notice.content}</p>
                   </div>
                 ))
