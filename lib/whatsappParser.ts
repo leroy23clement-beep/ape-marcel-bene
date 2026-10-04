@@ -16,19 +16,25 @@ export function parseWhatsAppExport(fileContent: string) {
     'pinard / vin': 0,
     'pastis': 0
   }
-  const emojiCountMap: { [key: string]: number } = {}
 
-  // Utilisation de la regex d'origine qui fonctionnait pour tes compteurs
-  const regexWhatsApp = /^\[?(\d{2}\/\d{2}\/\d{2,4}),?\s*(\d{2}:\d{2})(?::\d{2})?\]?\s*([^:-]+)[:|-]\s*(.*)$/
+  // Regex ultra-robuste adaptée à tous les exports WhatsApp (iOS et Android)
+  const regexWhatsApp = /^(?:\[?[\d./\s,-]+\]?|[\d./\s,-]+ -)?\s*([^:–-]+)[:–-]\s*(.*)$/
   const emojiRegex = /[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}]/gu;
 
   for (const line of lines) {
+    // On cherche une ligne qui contient un séparateur d'auteur (ex: "Nom: message" ou "Nom – message")
     const match = line.match(regexWhatsApp)
-    if (match) {
+    if (match && match[1] && match[2]) {
+      const author = match[1].trim()
+      const content = match[2].toLowerCase()
+      const rawContent = match[2]
+
+      // Ignorer les messages système (ex: "Les messages et les appels sont chiffrés...")
+      if (author.length > 30 || author.toLowerCase().includes('http') || author.toLowerCase().includes('sécurisés')) {
+        continue
+      }
+
       totalMessages++
-      const author = match[3].trim()
-      const content = match[4].toLowerCase()
-      const rawContent = match[4]
 
       // 1. Comptage par utilisateur
       userMessageCount[author] = (userMessageCount[author] || 0) + 1
@@ -70,9 +76,6 @@ export function parseWhatsAppExport(fileContent: string) {
       if (emojisInMessage) {
         totalEmojis += emojisInMessage.length
         userEmojiCount[author] = (userEmojiCount[author] || 0) + emojisInMessage.length
-        emojisInMessage.forEach((emoji) => {
-          emojiCountMap[emoji] = (emojiCountMap[emoji] || 0) + 1
-        })
       }
     }
   }
