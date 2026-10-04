@@ -22,9 +22,10 @@ export default function GalleryIndexPage() {
         setProfile(prof)
       }
 
+      // Récupérer les galeries ainsi que le titre, la date et l'image (affiche) de l'événement lié
       const { data } = await supabase
         .from('event_galleries')
-        .select('*, events(title, event_date)')
+        .select('*, events(title, event_date, image_url)')
         .order('created_at', { ascending: false })
 
       setGalleries(data || [])
@@ -66,36 +67,45 @@ export default function GalleryIndexPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {galleries.length > 0 ? (
-            galleries.map((gallery) => (
-              <Link 
-                key={gallery.id} 
-                href={`/gallery/${gallery.id}`}
-                className="bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group flex flex-col"
-              >
-                <div className="h-48 bg-gray-100 relative overflow-hidden flex items-center justify-center">
-                  {gallery.cover_image ? (
-                    <img src={gallery.cover_image} alt={gallery.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
-                  ) : (
-                    <span className="text-4xl">📷</span>
-                  )}
-                </div>
-                <div className="p-4 flex-1 flex flex-col justify-between space-y-2">
-                  <div>
-                    <h2 className="font-bold text-gray-900 text-base group-hover:text-purple-700 transition">
-                      {gallery.title}
-                    </h2>
-                    {gallery.events?.title && (
-                      <p className="text-xs text-purple-600 font-medium mt-0.5">
-                        Événement : {gallery.events.title}
-                      </p>
+            galleries.map((gallery) => {
+              // On utilise l'image de couverture de la galerie, ou à défaut l'affiche (image_url) de l'événement lié
+              const displayImage = gallery.cover_image || gallery.events?.image_url
+
+              return (
+                <Link 
+                  key={gallery.id} 
+                  href={`/gallery/${gallery.id}`}
+                  className="bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group flex flex-col"
+                >
+                  <div className="h-48 bg-gray-950/5 relative overflow-hidden flex items-center justify-center p-2 border-b">
+                    {displayImage ? (
+                      <img 
+                        src={displayImage} 
+                        alt={gallery.title} 
+                        className="w-full h-full object-contain group-hover:scale-105 transition duration-300 rounded-lg" 
+                      />
+                    ) : (
+                      <span className="text-4xl">📷</span>
                     )}
                   </div>
-                  <span className="text-xs text-gray-400 font-medium pt-2 border-t">
-                    Voir les photos →
-                  </span>
-                </div>
-              </Link>
-            ))
+                  <div className="p-4 flex-1 flex flex-col justify-between space-y-2">
+                    <div>
+                      <h2 className="font-bold text-gray-900 text-base group-hover:text-purple-700 transition">
+                        {gallery.title}
+                      </h2>
+                      {gallery.events?.title && (
+                        <p className="text-xs text-purple-600 font-medium mt-0.5">
+                          Événement : {gallery.events.title}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400 font-medium pt-2 border-t">
+                      Voir les photos →
+                    </span>
+                  </div>
+                </Link>
+              )
+            })
           ) : (
             <div className="col-span-full py-12 text-center bg-white rounded-2xl border text-gray-500 text-sm">
               Aucune galerie photo n'a encore été créée.
