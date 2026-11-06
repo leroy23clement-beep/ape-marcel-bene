@@ -20,13 +20,18 @@ export async function middleware(request: NextRequest) {
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              sameSite: 'lax',
+              secure: true,
+            })
           )
         },
       },
     }
   )
 
+  // Important : Rafraîchit la session utilisateur
   await supabase.auth.getUser()
 
   return supabaseResponse
