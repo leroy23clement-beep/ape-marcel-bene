@@ -102,9 +102,9 @@ export default async function DashboardPage() {
           <div className="bg-purple-900 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between space-y-4">
             <div>
               <span className="text-xs uppercase font-bold tracking-wider text-purple-300">Prochain rendez-vous</span>
-              <h3 className="text-lg font-extrabold mt-1">Vacances de la Toussaint 🎃</h3>
+              <h3 className="text-lg font-extrabold mt-1">Vacances de Noël 🎄</h3>
               <p className="text-xs text-purple-200 mt-0.5 capitalize">
-                📅 Du samedi 18 octobre au lundi 3 novembre 2026
+                📅 Du samedi 19 décembre 2026 au lundi 4 janvier 2027
               </p>
             </div>
             <HolidayCountdown />
