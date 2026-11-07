@@ -221,19 +221,35 @@ export default async function DashboardPage() {
             <div className="space-y-3">
               {products && products.length > 0 ? (
                 products.map((product) => (
-                  <Link
-                    key={product.id}
-                    href="/shop"
-                    className="block p-3 bg-gray-50 border rounded-lg space-y-1 hover:border-purple-500 transition cursor-pointer"
-                  >
-                    <div className="flex justify-between items-start">
-                      <h3 className="font-bold text-xs text-gray-900">{product.name}</h3>
-                      <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 whitespace-nowrap">
-                        {product.price ? `${product.price.toFixed(2)} €` : ""}
-                      </span>
+                  product.is_closed ? (
+                    <div
+                      key={product.id}
+                      className="p-3 bg-gray-100 border border-gray-200 rounded-lg space-y-1 opacity-60 cursor-not-allowed"
+                    >
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-bold text-xs text-gray-700 line-through">{product.name}</h3>
+                        <span className="text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                          🚫 Clôturée
+                        </span>
+                      </div>
+                      {product.description && <p className="text-[11px] text-gray-500 line-clamp-1">{product.description}</p>}
+                      <p className="text-[10px] text-gray-400 italic text-right pt-1">Vente clôturée aux commandes</p>
                     </div>
-                    {product.description && <p className="text-[11px] text-gray-500 line-clamp-1">{product.description}</p>}
-                  </Link>
+                  ) : (
+                    <Link
+                      key={product.id}
+                      href="/shop"
+                      className="block p-3 bg-gray-50 border rounded-lg space-y-1 hover:border-purple-500 transition cursor-pointer"
+                    >
+                      <div className="flex justify-between items-start">
+                        <h3 className="font-bold text-xs text-gray-900">{product.name}</h3>
+                        <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 whitespace-nowrap">
+                          {product.price ? `${product.price.toFixed(2)} €` : ""}
+                        </span>
+                      </div>
+                      {product.description && <p className="text-[11px] text-gray-500 line-clamp-1">{product.description}</p>}
+                    </Link>
+                  )
                 ))
               ) : (
                 <p className="text-xs text-gray-500 italic">Aucune vente en cours.</p>
@@ -243,7 +259,7 @@ export default async function DashboardPage() {
 
         </div>
 
-        {/* NOUVEAU BLOC : Concours Logo (Placé juste au-dessus de Mon Foyer) */}
+        {/* Concours Logo */}
         <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 p-6 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="space-y-1 text-center md:text-left">
             <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full uppercase tracking-wider">
