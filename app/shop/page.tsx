@@ -44,14 +44,12 @@ export default function ShopPage() {
   }, [])
 
   const fetchShopData = async (userId: string) => {
-    // Récupérer les produits / ventes
     const { data: prodData } = await supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false })
     setProducts(prodData || [])
 
-    // Récupérer les commandes
     const { data: ordData } = await supabase
       .from('orders')
       .select('*, products(*)')
@@ -128,7 +126,6 @@ export default function ShopPage() {
     }
   }
 
-  // Fonction pour clôturer ou rouvrir une vente
   const handleToggleCloseSale = async (productId: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
@@ -312,56 +309,4 @@ export default function ShopPage() {
                           </span>
                         )}
                         {product.is_closed && (
-                          <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-md">
-                            🚫 Clôturée
-                          </span>
-                        )}
-                      </div>
-
-                      {(product.start_date || product.end_date) && (
-                        <p className="text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-1 rounded w-fit border border-purple-200">
-                          🗓️ {product.start_date ? `Du ${new Date(product.start_date).toLocaleDateString("fr-FR")}` : ""} 
-                          {product.end_date ? ` au ${new Date(product.end_date).toLocaleDateString("fr-FR")}` : ""}
-                        </p>
-                      )}
-
-                      {product.description && (
-                        <p className="text-xs text-gray-600 leading-relaxed">{product.description}</p>
-                      )}
-                    </div>
-
-                    <div className="w-full md:w-auto space-y-3 min-w-[220px] flex flex-col items-end">
-                      {product.is_closed ? (
-                        <span className="w-full text-center px-4 py-2.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold border border-gray-200">
-                          Vente clôturée
-                        </span>
-                      ) : product.external_link ? (
-                        <a
-                          href={product.external_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full inline-flex justify-center items-center gap-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-medium py-2.5 rounded-lg transition"
-                        >
-                          🔗 Accéder au site de commande ↗
-                        </a>
-                      ) : (
-                        <form 
-                          onSubmit={(e) => {
-                            e.preventDefault()
-                            const form = e.currentTarget
-                            const qtyInput = form.elements.namedItem('quantity') as HTMLInputElement
-                            handleOrder(product.id, parseInt(qtyInput.value) || 1)
-                          }} 
-                          className="flex items-center gap-2 w-full"
-                        >
-                          <input
-                            type="number"
-                            name="quantity"
-                            min="1"
-                            defaultValue="1"
-                            className="w-16 text-xs p-2 border rounded-lg text-center bg-white text-gray-900"
-                            required
-                          />
-                          <button
-                            type="submit"
-                            className="flex-1 bg-emerald
+                          <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red
