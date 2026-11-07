@@ -43,7 +43,6 @@ export default function ShopPage() {
   }, [])
 
   const fetchShopData = async (userId: string) => {
-    // 1. Récupération des produits (isolée)
     const { data: prodData, error: prodError } = await supabase
       .from('products')
       .select('*')
@@ -55,7 +54,6 @@ export default function ShopPage() {
       setProducts(prodData || [])
     }
 
-    // 2. Récupération des commandes (isolée pour ne pas bloquer si la table orders manque)
     try {
       const { data: ordData, error: ordError } = await supabase
         .from('orders')
@@ -140,19 +138,24 @@ export default function ShopPage() {
   }
 
   const handleToggleCloseSale = async (productId: string, currentStatus: boolean) => {
+    console.log("Exécution de handleToggleCloseSale pour l'ID :", productId, "Statut cible :", !currentStatus)
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('products')
         .update({ is_closed: !currentStatus })
         .eq('id', productId)
+        .select()
 
       if (error) {
-        alert("Erreur Supabase lors du changement d'état : " + error.message)
+        console.error("Erreur Supabase :", error)
+        alert("Erreur Supabase : " + error.message)
         return
       }
 
+      console.log("Mise à jour réussie en base :", data)
       if (user) fetchShopData(user.id)
     } catch (error: any) {
+      console.error("Erreur inattendue :", error)
       alert("Erreur de connexion : " + error.message)
     }
   }
@@ -387,7 +390,10 @@ export default function ShopPage() {
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 w-full flex-wrap">
                           <button
                             type="button"
-                            onClick={() => handleToggleCloseSale(product.id, product.is_closed)}
+                            onClick={() => {
+                              console.log("Clic sur le bouton Clôturer pour le produit :", product.id)
+                              handleToggleCloseSale(product.id, product.is_closed)
+                            }}
                             className={`text-xs px-3 py-1 rounded font-medium cursor-pointer transition ${
                               product.is_closed 
                                 ? 'bg-green-50 text-green-700 hover:bg-green-100' 
