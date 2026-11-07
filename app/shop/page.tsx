@@ -44,7 +44,7 @@ export default function ShopPage() {
   }, [])
 
   const fetchShopData = async (userId: string) => {
-    // Récupérer les produits
+    // Récupérer les produits / ventes
     const { data: prodData } = await supabase
       .from('products')
       .select('*')
@@ -89,7 +89,7 @@ export default function ShopPage() {
       } else {
         const { error } = await supabase
           .from('products')
-          .insert(productData)
+          .insert({ ...productData, is_closed: false })
 
         if (error) throw error
         alert("Vente / Produit publié avec succès !")
@@ -128,6 +128,21 @@ export default function ShopPage() {
     }
   }
 
+  // Fonction pour clôturer ou rouvrir une vente
+  const handleToggleCloseSale = async (productId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_closed: !currentStatus })
+        .eq('id', productId)
+
+      if (error) throw error
+      if (user) fetchShopData(user.id)
+    } catch (error: any) {
+      alert("Erreur lors de la modification du statut : " + error.message)
+    }
+  }
+
   const resetForm = () => {
     setEditingId(null)
     setName('')
@@ -141,6 +156,11 @@ export default function ShopPage() {
   const handleOrder = async (productId: string, quantity: number) => {
     try {
       const product = products.find(p => p.id === productId)
+      if (product?.is_closed) {
+        alert("Cette vente est clôturée, il n'est plus possible de commander.")
+        return
+      }
+
       const totalPrice = (product?.price || 0) * quantity
 
       const { error } = await supabase.from('orders').insert({
@@ -291,6 +311,11 @@ export default function ShopPage() {
                             {product.price.toFixed(2)} €
                           </span>
                         )}
+                        {product.is_closed && (
+                          <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-md">
+                            🚫 Clôturée
+                          </span>
+                        )}
                       </div>
 
                       {(product.start_date || product.end_date) && (
@@ -305,8 +330,12 @@ export default function ShopPage() {
                       )}
                     </div>
 
-                    <div className="w-full md:w-auto space-y-3 min-w-[220px]">
-                      {product.external_link ? (
+                    <div className="w-full md:w-auto space-y-3 min-w-[220px] flex flex-col items-end">
+                      {product.is_closed ? (
+                        <span className="w-full text-center px-4 py-2.5 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold border border-gray-200">
+                          Vente clôturée
+                        </span>
+                      ) : product.external_link ? (
                         <a
                           href={product.external_link}
                           target="_blank"
@@ -323,7 +352,7 @@ export default function ShopPage() {
                             const qtyInput = form.elements.namedItem('quantity') as HTMLInputElement
                             handleOrder(product.id, parseInt(qtyInput.value) || 1)
                           }} 
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-2 w-full"
                         >
                           <input
                             type="number"
@@ -335,73 +364,4 @@ export default function ShopPage() {
                           />
                           <button
                             type="submit"
-                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-lg transition cursor-pointer"
-                          >
-                            Commander
-                          </button>
-                        </form>
-                      )}
-
-                      {isBureau && (
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(product)}
-                            className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1 rounded font-medium cursor-pointer"
-                          >
-                            Modifier
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            className="text-xs bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1 rounded font-medium cursor-pointer"
-                          >
-                            Supprimer
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Gestionnaire de tâches interne au bureau lié à cette vente */}
-                  {isBureau && (
-                    <div className="pt-3 border-t">
-                      <ProductTasksManager productId={product.id} />
-                    </div>
-                  )}
-                </div>
-              ))
-            ) : (
-              <div className="bg-white border rounded-xl p-8 text-center text-gray-500 text-sm">
-                Aucune vente en cours pour le moment.
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Historique des commandes directes */}
-        {userOrders && userOrders.length > 0 && (
-          <section className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
-            <h2 className="text-lg font-bold text-gray-800">Mes commandes directes</h2>
-            <div className="divide-y text-sm">
-              {userOrders.map((order) => (
-                <div key={order.id} className="py-3 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-gray-900">{order.products?.name}</p>
-                    <p className="text-xs text-gray-500">Quantité : {order.quantity}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-gray-900">{order.total_price?.toFixed(2)} €</p>
-                    <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                      {order.status === "pending" ? "En attente de règlement" : "Payée"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
-  )
-}
+                            className="flex-1 bg-emerald
