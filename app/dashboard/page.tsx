@@ -97,7 +97,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* Comptes à rebours */}
+        {/* Comptes à rebours regroupés */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-purple-900 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between space-y-4">
             <div>
