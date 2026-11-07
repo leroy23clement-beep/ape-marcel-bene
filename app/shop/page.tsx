@@ -194,7 +194,6 @@ export default function ShopPage() {
           </p>
         </header>
 
-        {/* Formulaire d'ajout / modification réservé au Bureau */}
         {isBureau && (
           <section className="bg-purple-50/50 border border-purple-200 rounded-xl p-5 space-y-4">
             <div className="flex justify-between items-center border-b border-purple-200 pb-2">
@@ -248,4 +247,43 @@ export default function ShopPage() {
                 />
               </div>
 
-              <div className="space-
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-700">Date de début de vente</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-700">Date de fin de vente</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
+                />
+              </div>
+
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-xs font-medium text-gray-700">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Informations sur la livraison, consignes, dates de retrait..."
+                  className="w-full text-sm p-2.5 rounded-lg border bg-white text-gray-900"
+                />
+              </div>
+
+              <div className="md:col-span-2 flex justify-end pt-2 border-t border-purple-200">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-purple-700 hover:bg-purple-800 disabled:bg-gray-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition cursor-pointer"
+                >
+                  {loading ? "Enregistrement..." : editingId ? "Mettre à jour" : "Publier la vente"}
+                </button>
+              </div>
