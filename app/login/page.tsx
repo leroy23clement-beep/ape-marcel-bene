@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
-import { Eye, EyeOff, Loader2, MailCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,14 +115,13 @@ function LoginForm({ next }: { next?: string }) {
 }
 
 function RegisterForm() {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Errors>({});
-  const [sentTo, setSentTo] = useState<string | null>(null);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const email = String(formData.get("email") ?? "");
     setErrors({});
     startTransition(async () => {
       const res = await signUp(formData);
@@ -130,22 +130,10 @@ function RegisterForm() {
         toast.error(res.error);
         return;
       }
-      toast.success(res.message);
-      setSentTo(email);
+      toast.success("Compte créé avec succès !");
+      router.push("/dashboard");
+      router.refresh();
     });
-  }
-
-  if (sentTo) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <MailCheck className="size-10 text-primary" />
-        <h2 className="text-lg font-semibold">Vérifiez votre boîte mail</h2>
-        <p className="text-sm text-muted-foreground">
-          Un lien de confirmation a été envoyé à <strong>{sentTo}</strong>. Cliquez dessus pour
-          activer votre compte.
-        </p>
-      </div>
-    );
   }
 
   return (
@@ -224,10 +212,9 @@ export default function LoginPage({
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6 rounded-xl border bg-card p-6 shadow-lg">
         
-        {/* === AJOUT DU LOGO ICI === */}
         <div className="flex flex-col items-center justify-center pb-2">
           <Image
-            src="/logo.jpg" /* Remplace par le nom de ton fichier image dans le dossier public */
+            src="/logo.jpg"
             alt="Logo APE"
             width={200}
             height={200}
@@ -235,7 +222,6 @@ export default function LoginPage({
             className="rounded-full object-contain"
           />
         </div>
-        {/* ========================= */}
 
         <AuthForms defaultTab="login" next={next} hasCallbackError={hasCallbackError} />
       </div>
