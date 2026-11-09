@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 export default function StocksManagement() {
   const supabase = createClient()
   const [items, setItems] = useState<any[]>([])
+  const [purchases, setPurchases] = useState<any[]>([])
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Champs formulaire nouvel article
@@ -16,16 +18,25 @@ export default function StocksManagement() {
   // Champs formulaire achat
   const [selectedItemId, setSelectedItemId] = useState('')
   const [quantity, setQuantity] = useState('')
-  const [unitPrice, setUnitPrice] = useState('') // Nouveau champ : Prix unitaire
+  const [unitPrice, setUnitPrice] = useState('')
   const [supplier, setSupplier] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
 
   const loadInventory = async () => {
-    const { data } = await supabase
+    // Récupération du catalogue
+    const { data: itemsData } = await supabase
       .from('inventory_items')
       .select('*')
       .order('category', { ascending: true })
-    if (data) setItems(data)
+
+    // Récupération des lots d'achats avec leurs dates de péremption
+    const { data: purchasesData } = await supabase
+      .from('inventory_purchases')
+      .select('*')
+      .order('expiration_date', { ascending: true })
+
+    if (itemsData) setItems(itemsData)
+    if (purchasesData) setPurchases(purchasesData)
     setLoading(false)
   }
 
@@ -56,7 +67,7 @@ export default function StocksManagement() {
 
     const qty = parseInt(quantity, 10)
     const uPrice = parseFloat(unitPrice)
-    const totalCost = qty * uPrice // Calcul automatique du coût total global
+    const totalCost = qty * uPrice
 
     const { error } = await supabase.from('inventory_purchases').insert({
       item_id: selectedItemId,
@@ -76,7 +87,10 @@ export default function StocksManagement() {
     }
   }
 
-  // Calcul dynamique du total pour affichage indicatif
+  const toggleExpand = (itemId: string) => {
+    setExpandedItemId(expandedItemId === itemId ? null : itemId)
+  }
+
   const calculatedTotal = (quantity && unitPrice) ? (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) : '0.00'
 
   if (loading) {
@@ -88,7 +102,7 @@ export default function StocksManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Gestion de la Réserve & Achats</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Suivez les stocks globaux et enregistrez les achats fournisseurs avec le prix unitaire et la péremption.
+          Suivez les stocks globaux, enregistrez les réassorts et consultez le détail des lots par date de péremption.
         </p>
       </header>
 
@@ -175,99 +189,4 @@ export default function StocksManagement() {
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   required
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Prix unitaire (€)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="ex: 0.75"
-                  value={unitPrice}
-                  onChange={(e) => setUnitPrice(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-            </div>
-
-            {/* Affichage indicatif du total calculé */}
-            <div className="text-xs text-gray-500 text-right bg-gray-50 p-2 rounded-lg border">
-              Coût total calculé : <strong className="text-gray-800">{calculatedTotal} €</strong>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Fournisseur</label>
-                <input
-                  type="text"
-                  placeholder="ex: Métro, E.Leclerc"
-                  value={supplier}
-                  onChange={(e) => setSupplier(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Date de péremption</label>
-                <input
-                  type="date"
-                  value={expirationDate}
-                  onChange={(e) => setExpirationDate(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-purple-700 hover:bg-purple-800 text-white font-medium text-sm py-2 px-4 rounded-xl transition cursor-pointer"
-            >
-              Valider l'achat
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* Tableau Réserve */}
-      <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
-          <span>📊</span> État de la Réserve Actuelle
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <th className="pb-3">Article</th>
-                <th className="pb-3">Catégorie</th>
-                <th className="pb-3 text-center">Stock en Réserve</th>
-                <th className="pb-3">Unité</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y text-sm">
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-6 text-center text-gray-500 italic">
-                    Aucun article dans la réserve pour le moment.
-                  </td>
-                </tr>
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="py-3 font-semibold text-gray-900">{item.name}</td>
-                    <td className="py-3 text-gray-600">{item.category}</td>
-                    <td className="py-3 text-center">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${item.current_stock > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {item.current_stock}
-                      </span>
-                    </td>
-                    <td className="py-3 text-gray-600">{item.unit}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
+                  className="w-full rounded-lg border border-gray-30
