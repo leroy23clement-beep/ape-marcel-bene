@@ -92,20 +92,14 @@ export default function ManifestationsManagement() {
       const initialStockBeforeEvent = item.current_stock
       const final = parseInt(row.finalStock, 10)
       const waste = parseInt(row.waste, 10) || 0
-      const price = row.price !== '' ? parseFloat(row.price) : (lastPrices[item.id] || 0)
 
-      const sold = Math.max(0, initialStockBeforeEvent - final - waste)
-      const revenue = sold * price
-
-      // 1. Insertion dans event_inventory (sans la colonne sold_quantity pour éviter l'erreur)
+      // 1. Insertion dans event_inventory (uniquement avec les colonnes de base garanties)
       const { error: insertError } = await supabase.from('event_inventory').insert({
         event_id: selectedEventId,
         item_id: item.id,
         initial_stock: initialStockBeforeEvent,
         final_stock: final,
-        waste_stock: waste,
-        unit_price: price,
-        total_revenue: revenue
+        waste_stock: waste
       })
 
       if (insertError) {
@@ -175,20 +169,18 @@ export default function ManifestationsManagement() {
                 <th className="p-3 text-center">Stock Réserve Actuel</th>
                 <th className="p-3 text-center">Stock Final Restant</th>
                 <th className="p-3 text-center">Pertes / Offerts</th>
-                <th className="p-3 text-right">Prix Vente Unitaire (€) (Optionnel)</th>
               </tr>
             </thead>
             <tbody className="divide-y text-sm">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-gray-500 italic">
+                  <td colSpan={5} className="py-6 text-center text-gray-500 italic">
                     Aucun article dans la réserve.
                   </td>
                 </tr>
               ) : (
                 items.map((item) => {
                   const row = rowsData[item.id] || { finalStock: '', waste: '0', price: '' }
-                  const defaultPriceDisplay = row.price !== '' ? row.price : (lastPrices[item.id] !== undefined ? lastPrices[item.id] : '')
 
                   return (
                     <tr key={item.id} className="hover:bg-gray-50">
@@ -216,17 +208,6 @@ export default function ManifestationsManagement() {
                           value={row.waste}
                           onChange={(e) => handleInputChange(item.id, 'waste', e.target.value)}
                           className="w-20 mx-auto rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </td>
-                      <td className="p-3 text-right">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder={lastPrices[item.id] !== undefined ? `${lastPrices[item.id]} €` : "optionnel"}
-                          value={defaultPriceDisplay}
-                          onChange={(e) => handleInputChange(item.id, 'price', e.target.value)}
-                          className="w-28 ml-auto rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                       </td>
                     </tr>
@@ -259,14 +240,13 @@ export default function ManifestationsManagement() {
                 <th className="pb-3">Événement</th>
                 <th className="pb-3">Article</th>
                 <th className="pb-3 text-center">Départ / Restant</th>
-                <th className="pb-3 text-center">Vendus</th>
-                <th className="pb-3 text-right">CA Théorique</th>
+                <th className="pb-3 text-center">Vendus / Consommés</th>
               </tr>
             </thead>
             <tbody className="divide-y text-sm">
               {eventInventories.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-gray-500 italic">
+                  <td colSpan={4} className="py-6 text-center text-gray-500 italic">
                     Aucun bilan de buvette enregistré pour le moment.
                   </td>
                 </tr>
@@ -282,9 +262,6 @@ export default function ManifestationsManagement() {
                       </td>
                       <td className="py-3 text-center font-bold text-gray-800">
                         {soldCalc} {inv.inventory_items?.unit}
-                      </td>
-                      <td className="py-3 text-right font-extrabold text-green-700">
-                        {inv.total_revenue?.toFixed(2)} €
                       </td>
                     </tr>
                   )
