@@ -17,19 +17,34 @@ export async function POST(request: Request) {
   const body = await request.json()
   const { title, message } = body
 
+  // 1. Récupérer d'abord les ID des utilisateurs ayant un rôle du bureau/admin
+  const allowedRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
+  const { data: profilesData, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .in('role', allowedRoles)
+
+  if (profileError || !profilesData || profilesData.length === 0) {
+    return NextResponse.json({ success: false, message: 'Aucun profil de bureau trouvé.' }, { status: 400 })
+  }
+
+  const allowedUserIds = profilesData.map((p) => p.id)
+
+  // 2. Récupérer uniquement les souscriptions push associées à ces membres du Codir
   const { data: subscriptions, error } = await supabase
     .from('push_subscriptions')
     .select('*')
+    .in('user_id', allowedUserIds) // Filtrage direct sur les membres autorisés
 
   if (error || !subscriptions || subscriptions.length === 0) {
-    return NextResponse.json({ success: false, message: 'Aucun appareil abonné aux notifications.' }, { status: 400 })
+    return NextResponse.json({ success: false, message: 'Aucun appareil de test enregistré pour les membres du bureau.' }, { status: 400 })
   }
 
   let sentCount = 0
 
   const payload = JSON.stringify({
-    title: title || '🔔 Test APE Marcel Béné',
-    body: message || 'Ceci est une notification de test envoyée depuis l\'Espace Bureau.',
+    title: title || '🔔 Test APE Marcel Béné (Codir)',
+    body: message || 'Ceci est une notification de test réservée au bureau.',
     url: '/events'
   })
 
@@ -53,6 +68,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
-    sentCount
+    sentCount,
+    message: `Notification de test envoyée à ${sentCount} membre(s) du bureau.`
   })
 }
