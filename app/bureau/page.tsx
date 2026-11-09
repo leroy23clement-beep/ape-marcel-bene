@@ -55,7 +55,6 @@ export default function BureauPage() {
   const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
   const canSendNotifications = notificationAllowedRoles.includes(userRole)
 
-  // Récupération directe des tableaux exacts renvoyés par le parseur
   const bavardsList = whatsappStats?.topBavardsList || []
   const emojiList = whatsappStats?.topEmojiUsersList || []
   const aperoWordsList = whatsappStats?.topAperoWordsList || []
@@ -83,6 +82,49 @@ export default function BureauPage() {
 
             {/* Grille des outils du bureau */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* === NOUVEAU : Réserve & Achats === */}
+              <Link 
+                href="/bureau/stocks"
+                className="block bg-white border border-amber-200 rounded-xl p-6 shadow-sm hover:border-amber-500 transition space-y-2 cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-gray-800 group-hover:text-amber-700 transition">📦 Réserve & Achats</h3>
+                  <span className="text-xs text-amber-700 font-medium">Gérer les stocks →</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Inventaire de la réserve, suivi des quantités et enregistrement des factures d'achats.
+                </p>
+              </Link>
+
+              {/* === NOUVEAU : Buvette & Bilans Manifestations === */}
+              <Link 
+                href="/bureau/manifestations"
+                className="block bg-white border border-emerald-200 rounded-xl p-6 shadow-sm hover:border-emerald-500 transition space-y-2 cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-gray-800 group-hover:text-emerald-700 transition">🥤 Buvette & Événements</h3>
+                  <span className="text-xs text-emerald-700 font-medium">Faire le bilan →</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Saisie des stocks avant/après événement, calcul du chiffre d'affaires et de la caisse.
+                </p>
+              </Link>
+
+              {/* === NOUVEAU : Prévisions d'Achats IA === */}
+              <Link 
+                href="/bureau/previsions"
+                className="block bg-white border border-blue-200 rounded-xl p-6 shadow-sm hover:border-blue-500 transition space-y-2 cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-gray-800 group-hover:text-blue-700 transition">🤖 Assistant Prévisions</h3>
+                  <span className="text-xs text-blue-700 font-medium">Estimer les besoins →</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Calculateur automatique des quantités à acheter selon l'événement et l'historique.
+                </p>
+              </Link>
+
               <Link 
                 href="/bureau/tresorerie"
                 className="block bg-white border rounded-xl p-6 shadow-sm hover:border-purple-500 transition space-y-2 cursor-pointer group"
@@ -162,7 +204,7 @@ export default function BureauPage() {
               </Link>
             </div>
 
-            {/* Widget des Statistiques WhatsApp cumulées (Top 3 et Indicateurs) */}
+            {/* Widget des Statistiques WhatsApp */}
             <div className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
               <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 <span>📈</span> Le Baromètre WhatsApp du Bureau (Cumulé)
@@ -170,7 +212,6 @@ export default function BureauPage() {
 
               {whatsappStats ? (
                 <div className="space-y-6">
-                  {/* Chiffres clés */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-center">
                       <p className="text-[10px] text-purple-600 font-bold uppercase">Messages totaux</p>
@@ -190,9 +231,7 @@ export default function BureauPage() {
                     </div>
                   </div>
 
-                  {/* Top 3 : Bavards & Emojis */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Top 3 Bavards */}
                     <div className="bg-gray-50 p-4 rounded-xl border space-y-2">
                       <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
                         <span>🏆</span> Top 3 des plus gros bavards
@@ -211,7 +250,6 @@ export default function BureauPage() {
                       </div>
                     </div>
 
-                    {/* Top 3 Emojis */}
                     <div className="bg-gray-50 p-4 rounded-xl border space-y-2">
                       <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
                         <span>👑</span> Top 3 Rois/Reines des Emojis
@@ -231,7 +269,6 @@ export default function BureauPage() {
                     </div>
                   </div>
 
-                  {/* Top 3 Variantes du mot Apéro */}
                   <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 space-y-2">
                     <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
                       <span>🍻</span> Top 3 des mots "Apéro" & Variantes

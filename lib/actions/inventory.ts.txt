@@ -1,0 +1,61 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+
+// Récupérer tous les articles et leur stock actuel
+export async function getInventoryItems() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("inventory_items")
+    .select("*")
+    .order("category", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Ajouter un nouvel article à la réserve
+export async function addItem(formData: FormData) {
+  const supabase = await createClient();
+  const name = formData.get("name") as string;
+  const category = formData.get("category") as string;
+  const unit = formData.get("unit") as string;
+
+  const { error } = await supabase.from("inventory_items").insert({
+    name,
+    category,
+    unit: unit || "unité",
+    current_stock: 0,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/bureau/stocks");
+  return { ok: true };
+}
+
+// Enregistrer un achat (qui incrémente automatiquement le stock via le trigger SQL)
+export async function addPurchase(formData: FormData) {
+  const supabase = await createClient();
+  const item_id = formData.get("item_id") as string;
+  const quantity = parseInt(formData.get("quantity") as string, 10);
+  const total_cost = parseFloat(formData.get("total_cost") as string);
+  const supplier = formData.get("supplier") as string;
+
+  const { error } = await supabase.from("inventory_purchases").insert({
+    item_id,
+    quantity,
+    total_cost,
+    supplier,
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/bureau/stocks");
+  return { ok: true };
+}
