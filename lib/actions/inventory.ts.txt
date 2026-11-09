@@ -3,7 +3,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-// Récupérer tous les articles et leur stock actuel
 export async function getInventoryItems() {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -15,7 +14,6 @@ export async function getInventoryItems() {
   return data;
 }
 
-// Ajouter un nouvel article à la réserve
 export async function addItem(formData: FormData) {
   const supabase = await createClient();
   const name = formData.get("name") as string;
@@ -37,7 +35,6 @@ export async function addItem(formData: FormData) {
   return { ok: true };
 }
 
-// Enregistrer un achat (qui incrémente automatiquement le stock via le trigger SQL)
 export async function addPurchase(formData: FormData) {
   const supabase = await createClient();
   const item_id = formData.get("item_id") as string;

@@ -1,0 +1,139 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bot, ShoppingBag, Sparkles } from "lucide-react";
+
+export default async function PrevisionsPage({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}) {
+  const supabase = createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+  const allowedRoles = ["admin", "bureau", "tresorier", "secretaire", "president"];
+  const userRole = profile?.role ? profile.role.toLowerCase() : "parent";
+  if (!allowedRoles.includes(userRole)) redirect("/dashboard");
+
+  const expectedAttendees = parseInt((searchParams?.attendees as string) || "100", 10);
+  const { data: items } = await supabase.from("inventory_items").select("*").order("name", { ascending: true });
+
+  // Ratios moyens de consommation par participant (ex: 0.6 boisson / pers)
+  const defaultRatios: Record<string, number> = {
+    Buvette: 0.7,
+    Restauration: 0.5,
+    Fournitures: 0.2,
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-12">
+      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
+
+      <main className="container mx-auto max-w-5xl space-y-8 p-6">
+        <div className="flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Assistant Prévisions d'Achats</h1>
+          <p className="text-sm text-gray-600">
+            Estimez automatiquement les commandes à réaliser pour vos prochains événements selon l'historique et votre réserve.
+          </p>
+        </div>
+
+        {/* Simulateur */}
+        <Card className="bg-white shadow-sm border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
+              <Sparkles className="size-5 text-blue-600" />
+              Paramètres de la manifestation à venir
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form method="GET" className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1">
+                <label htmlFor="attendees" className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre de participants attendus (enfants + parents)
+                </label>
+                <input
+                  id="attendees"
+                  name="attendees"
+                  type="number"
+                  min="10"
+                  defaultValue={expectedAttendees}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md text-sm transition"
+              >
+                Calculer le besoin
+              </button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Tableau des recommandations */}
+        <Card className="bg-white shadow-sm border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl text-gray-800">
+              <ShoppingBag className="size-6 text-blue-600" />
+              Recommandations de Commande ({expectedAttendees} personnes prévues)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b text-sm text-gray-500">
+                    <th className="pb-3 font-medium">Article</th>
+                    <th className="pb-3 font-medium">Catégorie</th>
+                    <th className="pb-3 font-medium text-center">Stock Actuel</th>
+                    <th className="pb-3 font-medium text-center">Besoin Estimé</th>
+                    <th className="pb-3 font-medium text-right">À Commander</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {items?.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-gray-500 italic">
+                        Ajoutez d'abord des articles dans la Réserve pour afficher les prévisions.
+                      </td>
+                    </tr>
+                  ) : (
+                    items?.map((item: any) => {
+                      const ratio = defaultRatios[item.category] || 0.5;
+                      const totalNeeded = Math.ceil(expectedAttendees * ratio);
+                      const toOrder = Math.max(0, totalNeeded - item.current_stock);
+
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50 text-sm">
+                          <td className="py-3 font-medium text-gray-900">{item.name}</td>
+                          <td className="py-3 text-gray-600">{item.category}</td>
+                          <td className="py-3 text-center text-gray-600">{item.current_stock} {item.unit}</td>
+                          <td className="py-3 text-center font-semibold text-gray-800">{totalNeeded}</td>
+                          <td className="py-3 text-right">
+                            {toOrder > 0 ? (
+                              <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900">
+                                +{toOrder} {item.unit}
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Stock suffisant
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  );
+}
