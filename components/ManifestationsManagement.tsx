@@ -18,7 +18,7 @@ export default function ManifestationsManagement() {
   const [salePrice, setSalePrice] = useState('')
 
   const loadData = async () => {
-    // Récupération des événements
+    // Récupération de tous les événements triés par date décroissante
     const { data: eventsData } = await supabase.from('events').select('*').order('date', { ascending: false })
     
     // Récupération des articles (avec leur stock global actuel)
@@ -30,7 +30,14 @@ export default function ManifestationsManagement() {
       .select('*, events(title), inventory_items(name, unit)')
       .order('id', { ascending: false })
 
-    if (eventsData) setEvents(eventsData)
+    if (eventsData) {
+      // Filtrer pour ne garder que les événements passés (date inférieure ou égale à aujourd'hui)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const pastEvents = eventsData.filter(ev => new Date(ev.date) <= today)
+      setEvents(pastEvents)
+    }
+
     if (itemsData) setItems(itemsData)
     if (inventoryData) setEventInventories(inventoryData)
     
@@ -45,7 +52,6 @@ export default function ManifestationsManagement() {
     e.preventDefault()
     if (!selectedEventId || !selectedItemId || finalStock === '' || !salePrice) return
 
-    // Retrouver l'article sélectionné pour connaître son stock actuel
     const currentItem = items.find(i => i.id === selectedItemId)
     if (!currentItem) return
 
@@ -54,11 +60,9 @@ export default function ManifestationsManagement() {
     const waste = parseInt(wasteStock, 10) || 0
     const price = parseFloat(salePrice)
 
-    // Calcul des quantités vendues : Stock actuel - Stock final restant - Pertes
     const sold = Math.max(0, initialStockBeforeEvent - final - waste)
     const revenue = sold * price
 
-    // 1. Enregistrer le bilan dans event_inventory
     const { error: insertError } = await supabase.from('event_inventory').insert({
       event_id: selectedEventId,
       item_id: selectedItemId,
@@ -75,7 +79,6 @@ export default function ManifestationsManagement() {
       return
     }
 
-    // 2. Mettre à jour le stock global dans inventory_items (le stock devient le stock final restant)
     const { error: updateError } = await supabase
       .from('inventory_items')
       .update({ current_stock: final })
@@ -86,7 +89,6 @@ export default function ManifestationsManagement() {
       return
     }
 
-    // Réinitialisation du formulaire et rechargement
     setSelectedEventId('')
     setSelectedItemId('')
     setFinalStock('')
@@ -95,7 +97,6 @@ export default function ManifestationsManagement() {
     loadData()
   }
 
-  // Article actuellement sélectionné dans le formulaire pour afficher le stock actuel indicatif
   const selectedItemData = items.find(i => i.id === selectedItemId)
 
   if (loading) {
@@ -107,7 +108,7 @@ export default function ManifestationsManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Buvette & Bilans d'Événements</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Saisissez ce qu'il vous reste en fin de manifestation pour déduire automatiquement les ventes et ajuster la réserve.
+          Sélectionnez un événement passé, saisissez le stock final restant et déduisez automatiquement les ventes.
         </p>
       </header>
 
@@ -120,14 +121,14 @@ export default function ManifestationsManagement() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Événement</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Événement passé</label>
               <select
                 value={selectedEventId}
                 onChange={(e) => setSelectedEventId(e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
               >
-                <option value="">Sélectionner un événement</option>
+                <option value="">Sélectionner un événement passé</option>
                 {events.map((ev) => (
                   <option key={ev.id} value={ev.id}>
                     {ev.title} ({new Date(ev.date).toLocaleDateString('fr-FR')})
