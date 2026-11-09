@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import Link from 'next/link'
+import Link from 'link'
 import SendNotificationForm from '@/components/SendNotificationForm'
+import PushNotificationTester from '@/components/PushNotificationTester'
 
 export default function BureauPage() {
   const supabase = createClient()
@@ -80,10 +81,13 @@ export default function BureauPage() {
               </p>
             </div>
 
+            {/* Testeur de Notifications Push */}
+            <PushNotificationTester />
+
             {/* Grille des outils du bureau */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
-              {/* === NOUVEAU : Réserve & Achats === */}
+              {/* Réserve & Achats */}
               <Link 
                 href="/bureau/stocks"
                 className="block bg-white border border-amber-200 rounded-xl p-6 shadow-sm hover:border-amber-500 transition space-y-2 cursor-pointer group"
@@ -97,7 +101,7 @@ export default function BureauPage() {
                 </p>
               </Link>
 
-              {/* === NOUVEAU : Buvette & Bilans Manifestations === */}
+              {/* Buvette & Bilans Manifestations */}
               <Link 
                 href="/bureau/manifestations"
                 className="block bg-white border border-emerald-200 rounded-xl p-6 shadow-sm hover:border-emerald-500 transition space-y-2 cursor-pointer group"
@@ -111,7 +115,7 @@ export default function BureauPage() {
                 </p>
               </Link>
 
-              {/* === NOUVEAU : Prévisions d'Achats IA === */}
+              {/* Prévisions d'Achats IA */}
               <Link 
                 href="/bureau/previsions"
                 className="block bg-white border border-blue-200 rounded-xl p-6 shadow-sm hover:border-blue-500 transition space-y-2 cursor-pointer group"
