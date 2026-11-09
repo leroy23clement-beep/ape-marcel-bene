@@ -1,3 +1,4 @@
+'app/client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -22,17 +23,15 @@ export default function ManifestationsManagement() {
     setLoading(true)
     setDbError(null)
 
-    // 1. Récupération des événements
+    // 1. Récupération des événements (sans tri par .date pour éviter tout blocage de colonne)
     const { data: eventsData, error: evError } = await supabase
       .from('events')
       .select('*')
-      .order('date', { ascending: false })
 
     if (evError) {
       console.error("Erreur events:", evError)
       setDbError(`Erreur table events: ${evError.message}`)
     } else {
-      console.log("Événements récupérés depuis Supabase :", eventsData)
       setEvents(eventsData || [])
     }
     
@@ -125,10 +124,9 @@ export default function ManifestationsManagement() {
         </p>
       </header>
 
-      {/* Alerte si erreur de base de données */}
       {dbError && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          <strong>Attention : </strong> {dbError} (Vérifie si la table s'appelle bien `events` dans Supabase).
+          <strong>Attention : </strong> {dbError}
         </div>
       )}
 
@@ -151,7 +149,7 @@ export default function ManifestationsManagement() {
                 <option value="">Sélectionner un événement ({events.length} dispo)</option>
                 {events.map((ev) => (
                   <option key={ev.id} value={ev.id}>
-                    {ev.title || 'Sans titre'} ({ev.date ? new Date(ev.date).toLocaleDateString('fr-FR') : 'Date non définie'})
+                    {ev.title || ev.name || 'Événement sans nom'}
                   </option>
                 ))}
               </select>
