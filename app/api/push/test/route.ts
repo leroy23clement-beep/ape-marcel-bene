@@ -2,13 +2,17 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/client'
 import webpush from 'web-push'
 
-webpush.setVapidDetails(
-  'mailto:contact@ape-marcel-bene.fr',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
-
 export async function POST(request: Request) {
+  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    return NextResponse.json({ success: false, message: "Clés VAPID manquantes dans Vercel." }, { status: 500 })
+  }
+
+  webpush.setVapidDetails(
+    'mailto:contact@ape-marcel-bene.fr',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
+
   const supabase = createClient()
   const body = await request.json()
   const { title, message } = body
