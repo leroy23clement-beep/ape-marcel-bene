@@ -92,21 +92,18 @@ export default function ManifestationsManagement() {
       const initialStockBeforeEvent = item.current_stock
       const final = parseInt(row.finalStock, 10)
       const waste = parseInt(row.waste, 10) || 0
-      
-      // Le prix n'est plus obligatoire (vaut 0 s'il n'est ni saisi ni trouvé dans l'historique)
       const price = row.price !== '' ? parseFloat(row.price) : (lastPrices[item.id] || 0)
 
       const sold = Math.max(0, initialStockBeforeEvent - final - waste)
       const revenue = sold * price
 
-      // 1. Insertion dans event_inventory
+      // 1. Insertion dans event_inventory (sans la colonne sold_quantity pour éviter l'erreur)
       const { error: insertError } = await supabase.from('event_inventory').insert({
         event_id: selectedEventId,
         item_id: item.id,
         initial_stock: initialStockBeforeEvent,
         final_stock: final,
         waste_stock: waste,
-        sold_quantity: sold,
         unit_price: price,
         total_revenue: revenue
       })
@@ -116,7 +113,7 @@ export default function ManifestationsManagement() {
         return
       }
 
-      // 2. Mise à jour du stock global
+      // 2. Mise à jour du stock global dans inventory_items
       const { error: updateError } = await supabase
         .from('inventory_items')
         .update({ current_stock: final })
@@ -141,7 +138,7 @@ export default function ManifestationsManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Buvette & Bilans d'Événements</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Remplissez le tableau des restes et validez tout en une seule fois. Le prix de vente est optionnel.
+          Remplissez le tableau des restes et validez tout en une seule fois.
         </p>
       </header>
 
@@ -274,21 +271,24 @@ export default function ManifestationsManagement() {
                   </td>
                 </tr>
               ) : (
-                eventInventories.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50">
-                    <td className="py-3 font-semibold text-gray-900">{inv.events?.title || 'Événement'}</td>
-                    <td className="py-3 text-gray-700">{inv.inventory_items?.name || 'Article'}</td>
-                    <td className="py-3 text-center text-gray-600">
-                      {inv.initial_stock} → <strong className="text-purple-700">{inv.final_stock}</strong> {inv.inventory_items?.unit}
-                    </td>
-                    <td className="py-3 text-center font-bold text-gray-800">
-                      {inv.sold_quantity} {inv.inventory_items?.unit}
-                    </td>
-                    <td className="py-3 text-right font-extrabold text-green-700">
-                      {inv.total_revenue?.toFixed(2)} €
-                    </td>
-                  </tr>
-                ))
+                eventInventories.map((inv) => {
+                  const soldCalc = Math.max(0, (inv.initial_stock || 0) - (inv.final_stock || 0) - (inv.waste_stock || 0))
+                  return (
+                    <tr key={inv.id} className="hover:bg-gray-50">
+                      <td className="py-3 font-semibold text-gray-900">{inv.events?.title || 'Événement'}</td>
+                      <td className="py-3 text-gray-700">{inv.inventory_items?.name || 'Article'}</td>
+                      <td className="py-3 text-center text-gray-600">
+                        {inv.initial_stock} → <strong className="text-purple-700">{inv.final_stock}</strong> {inv.inventory_items?.unit}
+                      </td>
+                      <td className="py-3 text-center font-bold text-gray-800">
+                        {soldCalc} {inv.inventory_items?.unit}
+                      </td>
+                      <td className="py-3 text-right font-extrabold text-green-700">
+                        {inv.total_revenue?.toFixed(2)} €
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
