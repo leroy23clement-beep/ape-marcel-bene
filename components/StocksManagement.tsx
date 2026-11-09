@@ -18,6 +18,7 @@ export default function StocksManagement() {
   const [quantity, setQuantity] = useState('')
   const [totalCost, setTotalCost] = useState('')
   const [supplier, setSupplier] = useState('')
+  const [expirationDate, setExpirationDate] = useState('') // Nouveau champ
 
   const loadInventory = async () => {
     const { data } = await supabase
@@ -57,7 +58,8 @@ export default function StocksManagement() {
       item_id: selectedItemId,
       quantity: parseInt(quantity, 10),
       total_cost: parseFloat(totalCost),
-      supplier: supplier || null
+      supplier: supplier || null,
+      expiration_date: expirationDate || null // Enregistrement de la date de péremption
     })
 
     if (!error) {
@@ -65,6 +67,7 @@ export default function StocksManagement() {
       setQuantity('')
       setTotalCost('')
       setSupplier('')
+      setExpirationDate('')
       loadInventory()
     }
   }
@@ -78,7 +81,7 @@ export default function StocksManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Gestion de la Réserve & Achats</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Suivez les stocks globaux et enregistrez les achats fournisseurs.
+          Suivez les stocks globaux et enregistrez les achats fournisseurs avec leurs dates de péremption.
         </p>
       </header>
 
@@ -181,19 +184,30 @@ export default function StocksManagement() {
                 />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Fournisseur</label>
-              <input
-                type="text"
-                placeholder="ex: Métro, E.Leclerc"
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Fournisseur</label>
+                <input
+                  type="text"
+                  placeholder="ex: Métro, E.Leclerc"
+                  value={supplier}
+                  onChange={(e) => setSupplier(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Date de péremption</label>
+                <input
+                  type="date"
+                  value={expirationDate}
+                  onChange={(e) => setExpirationDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                />
+              </div>
             </div>
             <button
               type="submit"
-              className="w-full bg-purple-700 hover:bg-purple-800 text-white font-medium text-sm py-2 px-4 rounded-xl transition cursor-pointer"
+              className="w-full bg-purple-700 hover:bg-purple-800Text-white font-medium text-sm py-2 px-4 rounded-xl transition cursor-pointer"
             >
               Valider l'achat
             </button>
