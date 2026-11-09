@@ -16,9 +16,9 @@ export default function StocksManagement() {
   // Champs formulaire achat
   const [selectedItemId, setSelectedItemId] = useState('')
   const [quantity, setQuantity] = useState('')
-  const [totalCost, setTotalCost] = useState('')
+  const [unitPrice, setUnitPrice] = useState('') // Nouveau champ : Prix unitaire
   const [supplier, setSupplier] = useState('')
-  const [expirationDate, setExpirationDate] = useState('') // Nouveau champ
+  const [expirationDate, setExpirationDate] = useState('')
 
   const loadInventory = async () => {
     const { data } = await supabase
@@ -52,25 +52,32 @@ export default function StocksManagement() {
 
   const handleAddPurchase = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedItemId || !quantity || !totalCost) return
+    if (!selectedItemId || !quantity || !unitPrice) return
+
+    const qty = parseInt(quantity, 10)
+    const uPrice = parseFloat(unitPrice)
+    const totalCost = qty * uPrice // Calcul automatique du coût total global
 
     const { error } = await supabase.from('inventory_purchases').insert({
       item_id: selectedItemId,
-      quantity: parseInt(quantity, 10),
-      total_cost: parseFloat(totalCost),
+      quantity: qty,
+      total_cost: totalCost,
       supplier: supplier || null,
-      expiration_date: expirationDate || null // Enregistrement de la date de péremption
+      expiration_date: expirationDate || null
     })
 
     if (!error) {
       setSelectedItemId('')
       setQuantity('')
-      setTotalCost('')
+      setUnitPrice('')
       setSupplier('')
       setExpirationDate('')
       loadInventory()
     }
   }
+
+  // Calcul dynamique du total pour affichage indicatif
+  const calculatedTotal = (quantity && unitPrice) ? (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) : '0.00'
 
   if (loading) {
     return <div className="text-center py-12 text-gray-500 text-sm">Chargement de la réserve...</div>
@@ -81,7 +88,7 @@ export default function StocksManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Gestion de la Réserve & Achats</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Suivez les stocks globaux et enregistrez les achats fournisseurs avec leurs dates de péremption.
+          Suivez les stocks globaux et enregistrez les achats fournisseurs avec le prix unitaire et la péremption.
         </p>
       </header>
 
@@ -164,7 +171,7 @@ export default function StocksManagement() {
                 <input
                   type="number"
                   min="1"
-                  placeholder="ex: 48"
+                  placeholder="ex: 97"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   required
@@ -172,18 +179,24 @@ export default function StocksManagement() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Coût total (€)</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Prix unitaire (€)</label>
                 <input
                   type="number"
                   step="0.01"
-                  placeholder="ex: 35.50"
-                  value={totalCost}
-                  onChange={(e) => setTotalCost(e.target.value)}
+                  placeholder="ex: 0.75"
+                  value={unitPrice}
+                  onChange={(e) => setUnitPrice(e.target.value)}
                   required
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
             </div>
+
+            {/* Affichage indicatif du total calculé */}
+            <div className="text-xs text-gray-500 text-right bg-gray-50 p-2 rounded-lg border">
+              Coût total calculé : <strong className="text-gray-800">{calculatedTotal} €</strong>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Fournisseur</label>
@@ -207,7 +220,7 @@ export default function StocksManagement() {
             </div>
             <button
               type="submit"
-              className="w-full bg-purple-700 hover:bg-purple-800Text-white font-medium text-sm py-2 px-4 rounded-xl transition cursor-pointer"
+              className="w-full bg-purple-700 hover:bg-purple-800 text-white font-medium text-sm py-2 px-4 rounded-xl transition cursor-pointer"
             >
               Valider l'achat
             </button>
