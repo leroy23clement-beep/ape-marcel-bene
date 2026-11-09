@@ -11,10 +11,7 @@ export default function ManifestationsManagement() {
   const [loading, setLoading] = useState(true)
   const [dbError, setDbError] = useState<string | null>(null)
 
-  // Sélection de l'événement
   const [selectedEventId, setSelectedEventId] = useState('')
-
-  // État local pour stocker les saisies du tableau (clé = item_id, valeur = { finalStock, waste, price })
   const [rowsData, setRowsData] = useState<Record<string, { finalStock: string; waste: string; price: string }>>({})
   const [lastPrices, setLastPrices] = useState<Record<string, number>>({})
 
@@ -22,28 +19,15 @@ export default function ManifestationsManagement() {
     setLoading(true)
     setDbError(null)
 
-    // 1. Récupération des événements
-    const { data: eventsData, error: evError } = await supabase
-      .from('events')
-      .select('*')
-
-    if (evError) {
-      setDbError(`Erreur table events: ${evError.message}`)
-    } else {
-      setEvents(eventsData || [])
-    }
+    const { data: eventsData, error: evError } = await supabase.from('events').select('*')
+    if (evError) setDbError(`Erreur events: ${evError.message}`)
+    else setEvents(eventsData || [])
     
-    // 2. Récupération des articles de la réserve
-    const { data: itemsData, error: itError } = await supabase
-      .from('inventory_items')
-      .select('*')
-      .order('name', { ascending: true })
-
+    const { data: itemsData, error: itError } = await supabase.from('inventory_items').select('*').order('name', { ascending: true })
     if (itError) console.error("Erreur items:", itError)
     
     if (itemsData) {
       setItems(itemsData)
-      // Initialisation par défaut des lignes du tableau
       const initialRows: Record<string, { finalStock: string; waste: string; price: string }> = {}
       itemsData.forEach(item => {
         initialRows[item.id] = { finalStock: '', waste: '0', price: '' }
@@ -51,7 +35,6 @@ export default function ManifestationsManagement() {
       setRowsData(initialRows)
     }
     
-    // 3. Récupération de l'historique des bilans (pour récupérer les derniers prix de vente utilisés)
     const { data: inventoryData, error: invError } = await supabase
       .from('event_inventory')
       .select('*, events(title), inventory_items(name, unit)')
@@ -61,8 +44,6 @@ export default function ManifestationsManagement() {
     
     if (inventoryData) {
       setEventInventories(inventoryData)
-
-      // Extraire le dernier prix de vente connu pour chaque article
       const pricesMap: Record<string, number> = {}
       inventoryData.forEach((inv) => {
         if (inv.item_id && inv.unit_price && !pricesMap[inv.item_id]) {
@@ -79,7 +60,6 @@ export default function ManifestationsManagement() {
     loadData()
   }, [])
 
-  // Mettre à jour un champ spécifique d'un article dans le tableau
   const handleInputChange = (itemId: string, field: 'finalStock' | 'waste' | 'price', value: string) => {
     setRowsData(prev => ({
       ...prev,
@@ -90,7 +70,6 @@ export default function ManifestationsManagement() {
     }))
   }
 
-  // Validation globale de tout le bilan d'un coup
   const handleSubmitAll = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedEventId) {
@@ -98,7 +77,6 @@ export default function ManifestationsManagement() {
       return
     }
 
-    // Filtrer uniquement les articles pour lesquels l'utilisateur a saisi un stock final
     const itemsToSave = items.filter(item => {
       const row = rowsData[item.id]
       return row && row.finalStock !== ''
@@ -109,20 +87,28 @@ export default function ManifestationsManagement() {
       return
     }
 
+    // Vérifier si tous les articles sélectionnés ont bien un prix de vente valide
+    for (const item of itemsToSave) {
+      const row = rowsData[item.id]
+      const price = row.price !== '' ? parseFloat(row.price) : (lastPrices[item.id] || 0)
+      if (isNaN(price) || price <= 0) {
+        alert(`Le prix de vente unitaire est requis et doit être supérieur à 0 pour l'article : ${item.name}`)
+        return
+      }
+    }
+
     for (const item of itemsToSave) {
       const row = rowsData[item.id]
       const initialStockBeforeEvent = item.current_stock
       const final = parseInt(row.finalStock, 10)
       const waste = parseInt(row.waste, 10) || 0
-      
-      // Utiliser le prix saisi ou retomber sur le dernier prix connu, ou 0 par défaut
-      const price = row.price !== '' ? parseFloat(row.price) : (lastPrices[item.id] || 0)
+      const price = row.price !== '' ? parseFloat(row.price) : lastPrices[item.id]
 
       const sold = Math.max(0, initialStockBeforeEvent - final - waste)
       const revenue = sold * price
 
-      // 1. Enregistrer dans event_inventory
-      await supabase.from('event_inventory').insert({
+      // 1. Insertion dans event_inventory
+      const { error: insertError } = await supabase.from('event_inventory').insert({
         event_id: selectedEventId,
         item_id: item.id,
         initial_stock: initialStockBeforeEvent,
@@ -133,19 +119,29 @@ export default function ManifestationsManagement() {
         total_revenue: revenue
       })
 
-      // 2. Mettre à jour le stock global dans inventory_items
-      await supabase
+      if (insertError) {
+        alert(`Erreur insertion pour ${item.name} : ${insertError.message}`)
+        return
+      }
+
+      // 2. Mise à jour du stock global
+      const { error: updateError } = await supabase
         .from('inventory_items')
         .update({ current_stock: final })
         .eq('id', item.id)
+
+      if (updateError) {
+        alert(`Erreur mise à jour stock pour ${item.name} : ${updateError.message}`)
+        return
+      }
     }
 
-    alert("Bilan de l'événement enregistré avec succès et stocks mis à jour !")
+    alert("Bilan enregistré avec succès !")
     loadData()
   }
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500 text-sm">Chargement des bilans de manifestations...</div>
+    return <div className="text-center py-12 text-gray-500 text-sm">Chargement...</div>
   }
 
   return (
@@ -153,7 +149,7 @@ export default function ManifestationsManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Buvette & Bilans d'Événements</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Sélectionnez l'événement, remplissez le tableau des restes en un clin d'œil, et validez tout en une seule fois.
+          Remplissez le tableau des restes et validez tout en une seule fois.
         </p>
       </header>
 
@@ -163,7 +159,6 @@ export default function ManifestationsManagement() {
         </div>
       )}
 
-      {/* Formulaire Global en Tableau */}
       <form onSubmit={handleSubmitAll} className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
         <div className="max-w-md">
           <label className="block text-xs font-medium text-gray-700 mb-1">Événement concerné</label>
@@ -173,7 +168,7 @@ export default function ManifestationsManagement() {
             required
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
           >
-            <option value="">Sélectionner un événement ({events.length} dispo)</option>
+            <option value="">Sélectionner un événement</option>
             {events.map((ev) => (
               <option key={ev.id} value={ev.id}>
                 {ev.title || ev.name || 'Événement sans nom'}
@@ -198,13 +193,12 @@ export default function ManifestationsManagement() {
               {items.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-6 text-center text-gray-500 italic">
-                    Aucun article dans la réserve. Ajoutez des articles dans le module Stock avant de faire un bilan.
+                    Aucun article dans la réserve.
                   </td>
                 </tr>
               ) : (
                 items.map((item) => {
                   const row = rowsData[item.id] || { finalStock: '', waste: '0', price: '' }
-                  // Prix par défaut : soit ce que l'utilisateur tape, soit le dernier prix connu, soit vide
                   const defaultPriceDisplay = row.price !== '' ? row.price : (lastPrices[item.id] !== undefined ? lastPrices[item.id] : '')
 
                   return (
@@ -240,7 +234,7 @@ export default function ManifestationsManagement() {
                           type="number"
                           step="0.01"
                           min="0"
-                          placeholder={lastPrices[item.id] !== undefined ? `${lastPrices[item.id]} € (dernier)` : "ex: 1.50"}
+                          placeholder={lastPrices[item.id] !== undefined ? `${lastPrices[item.id]} €` : "ex: 1.50"}
                           value={defaultPriceDisplay}
                           onChange={(e) => handleInputChange(item.id, 'price', e.target.value)}
                           className="w-28 ml-auto rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -264,7 +258,7 @@ export default function ManifestationsManagement() {
         </div>
       </form>
 
-      {/* Historique des Ventes et Recettes Calculées */}
+      {/* Historique */}
       <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
         <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
           <span>📊</span> Historique des Bilans et Recettes de Buvette
