@@ -9,6 +9,7 @@ export default function ManifestationsManagement() {
   const [items, setItems] = useState<any[]>([])
   const [eventInventories, setEventInventories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [dbError, setDbError] = useState<string | null>(null)
 
   // Champs du formulaire simplifié
   const [selectedEventId, setSelectedEventId] = useState('')
@@ -18,32 +19,39 @@ export default function ManifestationsManagement() {
   const [salePrice, setSalePrice] = useState('')
 
   const loadData = async () => {
-    // Récupération de tous les événements
+    setLoading(true)
+    setDbError(null)
+
+    // 1. Récupération des événements
     const { data: eventsData, error: evError } = await supabase
       .from('events')
       .select('*')
       .order('date', { ascending: false })
 
-    if (evError) console.error("Erreur chargement events:", evError)
+    if (evError) {
+      console.error("Erreur events:", evError)
+      setDbError(`Erreur table events: ${evError.message}`)
+    } else {
+      console.log("Événements récupérés depuis Supabase :", eventsData)
+      setEvents(eventsData || [])
+    }
     
-    // Récupération des articles
+    // 2. Récupération des articles
     const { data: itemsData, error: itError } = await supabase
       .from('inventory_items')
       .select('*')
       .order('name', { ascending: true })
 
-    if (itError) console.error("Erreur chargement items:", itError)
+    if (itError) console.error("Erreur items:", itError)
+    if (itemsData) setItems(itemsData)
     
-    // Récupération de l'historique des bilans
+    // 3. Récupération de l'historique des bilans
     const { data: inventoryData, error: invError } = await supabase
       .from('event_inventory')
       .select('*, events(title), inventory_items(name, unit)')
       .order('id', { ascending: false })
 
-    if (invError) console.error("Erreur chargement inventory:", invError)
-
-    if (eventsData) setEvents(eventsData)
-    if (itemsData) setItems(itemsData)
+    if (invError) console.error("Erreur inventory:", invError)
     if (inventoryData) setEventInventories(inventoryData)
     
     setLoading(false)
@@ -117,6 +125,13 @@ export default function ManifestationsManagement() {
         </p>
       </header>
 
+      {/* Alerte si erreur de base de données */}
+      {dbError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+          <strong>Attention : </strong> {dbError} (Vérifie si la table s'appelle bien `events` dans Supabase).
+        </div>
+      )}
+
       {/* Formulaire Simplifié */}
       <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
         <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
@@ -136,7 +151,7 @@ export default function ManifestationsManagement() {
                 <option value="">Sélectionner un événement ({events.length} dispo)</option>
                 {events.map((ev) => (
                   <option key={ev.id} value={ev.id}>
-                    {ev.title} ({ev.date ? new Date(ev.date).toLocaleDateString('fr-FR') : 'Date non définie'})
+                    {ev.title || 'Sans titre'} ({ev.date ? new Date(ev.date).toLocaleDateString('fr-FR') : 'Date non définie'})
                   </option>
                 ))}
               </select>
