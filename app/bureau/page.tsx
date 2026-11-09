@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import Link from 'link'
+import Link from 'next/link'
 import SendNotificationForm from '@/components/SendNotificationForm'
 import PushNotificationTester from '@/components/PushNotificationTester'
 
