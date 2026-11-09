@@ -7,25 +7,33 @@ export default function ManifestationsManagement() {
   const supabase = createClient()
   const [events, setEvents] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
-  const [eventInventory, setEventInventory] = useState<any[]>([])
+  const [eventInventories, setEventInventories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Formulaire
-  const [eventId, setEventId] = useState('')
-  const [itemId, setItemId] = useState('')
-  const [initialStock, setInitialStock] = useState('0')
-  const [finalStock, setFinalStock] = useState('0')
+  // Champs du formulaire simplifié
+  const [selectedEventId, setSelectedEventId] = useState('')
+  const [selectedItemId, setSelectedItemId] = useState('')
+  const [finalStock, setFinalStock] = useState('')
   const [wasteStock, setWasteStock] = useState('0')
-  const [unitPrice, setUnitPrice] = useState('')
+  const [salePrice, setSalePrice] = useState('')
 
   const loadData = async () => {
-    const { data: evData } = await supabase.from('events').select('*').order('event_date', { ascending: false })
-    const { data: itData } = await supabase.from('inventory_items').select('*').order('name', { ascending: true })
-    const { data: invData } = await supabase.from('event_inventory').select('*, events(title), inventory_items(name)')
+    // Récupération des événements
+    const { data: eventsData } = await supabase.from('events').select('*').order('date', { ascending: false })
     
-    if (evData) setEvents(evData)
-    if (itData) setItems(itData)
-    if (invData) setEventInventory(invData)
+    // Récupération des articles (avec leur stock global actuel)
+    const { data: itemsData } = await supabase.from('inventory_items').select('*').order('name', { ascending: true })
+    
+    // Récupération de l'historique des bilans enregistrés
+    const { data: inventoryData } = await supabase
+      .from('event_inventory')
+      .select('*, events(title), inventory_items(name, unit)')
+      .order('id', { ascending: false })
+
+    if (eventsData) setEvents(eventsData)
+    if (itemsData) setItems(itemsData)
+    if (inventoryData) setEventInventories(inventoryData)
+    
     setLoading(false)
   }
 
@@ -35,28 +43,63 @@ export default function ManifestationsManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!eventId || !itemId || !unitPrice) return
+    if (!selectedEventId || !selectedItemId || finalStock === '' || !salePrice) return
 
-    const { error } = await supabase.from('event_inventory').insert({
-      event_id: eventId,
-      item_id: itemId,
-      initial_stock: parseInt(initialStock, 10) || 0,
-      final_stock: parseInt(finalStock, 10) || 0,
-      waste_stock: parseInt(wasteStock, 10) || 0,
-      unit_price: parseFloat(unitPrice) || 0,
+    // Retrouver l'article sélectionné pour connaître son stock actuel
+    const currentItem = items.find(i => i.id === selectedItemId)
+    if (!currentItem) return
+
+    const initialStockBeforeEvent = currentItem.current_stock
+    const final = parseInt(finalStock, 10)
+    const waste = parseInt(wasteStock, 10) || 0
+    const price = parseFloat(salePrice)
+
+    // Calcul des quantités vendues : Stock actuel - Stock final restant - Pertes
+    const sold = Math.max(0, initialStockBeforeEvent - final - waste)
+    const revenue = sold * price
+
+    // 1. Enregistrer le bilan dans event_inventory
+    const { error: insertError } = await supabase.from('event_inventory').insert({
+      event_id: selectedEventId,
+      item_id: selectedItemId,
+      initial_stock: initialStockBeforeEvent,
+      final_stock: final,
+      waste_stock: waste,
+      sold_quantity: sold,
+      unit_price: price,
+      total_revenue: revenue
     })
 
-    if (!error) {
-      setInitialStock('0')
-      setFinalStock('0')
-      setWasteStock('0')
-      setUnitPrice('')
-      loadData()
+    if (insertError) {
+      alert("Erreur lors de l'enregistrement du bilan.")
+      return
     }
+
+    // 2. Mettre à jour le stock global dans inventory_items (le stock devient le stock final restant)
+    const { error: updateError } = await supabase
+      .from('inventory_items')
+      .update({ current_stock: final })
+      .eq('id', selectedItemId)
+
+    if (updateError) {
+      alert("Erreur lors de la mise à jour du stock global.")
+      return
+    }
+
+    // Réinitialisation du formulaire et rechargement
+    setSelectedEventId('')
+    setSelectedItemId('')
+    setFinalStock('')
+    setWasteStock('0')
+    setSalePrice('')
+    loadData()
   }
 
+  // Article actuellement sélectionné dans le formulaire pour afficher le stock actuel indicatif
+  const selectedItemData = items.find(i => i.id === selectedItemId)
+
   if (loading) {
-    return <div className="text-center py-12 text-gray-500 text-sm">Chargement des bilans...</div>
+    return <div className="text-center py-12 text-gray-500 text-sm">Chargement des bilans de manifestations...</div>
   }
 
   return (
@@ -64,88 +107,95 @@ export default function ManifestationsManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Buvette & Bilans d'Événements</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Saisissez les stocks emportés et rapportés pour calculer les recettes de caisse.
+          Saisissez ce qu'il vous reste en fin de manifestation pour déduire automatiquement les ventes et ajuster la réserve.
         </p>
       </header>
 
-      {/* Formulaire Saisie Stock Manifestation */}
+      {/* Formulaire Simplifié */}
       <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
         <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
-          <span>🥤</span> Saisir un bilan buvette / restauration
+          <span>🥤</span> Saisie du Bilan par Article
         </h2>
+        
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Événement</label>
               <select
-                value={eventId}
-                onChange={(e) => setEventId(e.target.value)}
+                value={selectedEventId}
+                onChange={(e) => setSelectedEventId(e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
               >
                 <option value="">Sélectionner un événement</option>
                 {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{ev.title}</option>
+                  <option key={ev.id} value={ev.id}>
+                    {ev.title} ({new Date(ev.date).toLocaleDateString('fr-FR')})
+                  </option>
                 ))}
               </select>
             </div>
+
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Article</label>
               <select
-                value={itemId}
-                onChange={(e) => setItemId(e.target.value)}
+                value={selectedItemId}
+                onChange={(e) => setSelectedItemId(e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
               >
                 <option value="">Sélectionner un article</option>
-                {items.map((it) => (
-                  <option key={it.id} value={it.id}>{it.name} (Réserve : {it.current_stock})</option>
+                {items.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} (En réserve : {item.current_stock} {item.unit})
+                  </option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Stock Initial (pris)</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Stock Final Restant <span className="text-purple-700 font-bold">*</span>
+              </label>
               <input
                 type="number"
                 min="0"
-                value={initialStock}
-                onChange={(e) => setInitialStock(e.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Stock Final (restant)</label>
-              <input
-                type="number"
-                min="0"
+                placeholder="ex: 12"
                 value={finalStock}
                 onChange={(e) => setFinalStock(e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
+              {selectedItemData && (
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Stock actuel en réserve : <strong className="text-gray-800">{selectedItemData.current_stock} {selectedItemData.unit}</strong>
+                </p>
+              )}
             </div>
+
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Pertes / Offerts</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Pertes / Offerts (Casse, etc.)</label>
               <input
                 type="number"
                 min="0"
+                placeholder="ex: 2"
                 value={wasteStock}
                 onChange={(e) => setWasteStock(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Prix Vente (€)</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Prix de vente unitaire (€)</label>
               <input
                 type="number"
-                step="0.10"
+                step="0.01"
+                min="0"
                 placeholder="ex: 1.50"
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value)}
+                value={salePrice}
+                onChange={(e) => setSalePrice(e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
@@ -154,17 +204,17 @@ export default function ManifestationsManagement() {
 
           <button
             type="submit"
-            className="w-full bg-purple-700 hover:bg-purple-800 text-white font-medium text-sm py-2 px-4 rounded-xl transition cursor-pointer"
+            className="w-full bg-purple-700 hover:bg-purple-800 text-white font-medium text-sm py-2.5 px-4 rounded-xl transition cursor-pointer"
           >
-            Enregistrer le bilan de cet article
+            Enregistrer le bilan & mettre à jour le stock
           </button>
         </form>
       </div>
 
-      {/* Tableau des ventes */}
+      {/* Historique des Ventes et Recettes Calculées */}
       <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
         <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
-          <span>🧾</span> Ventes et Recettes Calculées
+          <span>📊</span> Historique des Bilans et Recettes de Buvette
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -172,32 +222,34 @@ export default function ManifestationsManagement() {
               <tr className="border-b text-xs font-bold text-gray-500 uppercase tracking-wider">
                 <th className="pb-3">Événement</th>
                 <th className="pb-3">Article</th>
-                <th className="pb-3 text-center">Pris / Restant</th>
+                <th className="pb-3 text-center">Départ / Restant</th>
                 <th className="pb-3 text-center">Vendus</th>
                 <th className="pb-3 text-right">CA Théorique</th>
               </tr>
             </thead>
             <tbody className="divide-y text-sm">
-              {eventInventory.length === 0 ? (
+              {eventInventories.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-6 text-center text-gray-500 italic">
                     Aucun bilan de buvette enregistré pour le moment.
                   </td>
                 </tr>
               ) : (
-                eventInventory.map((row) => {
-                  const sold = Math.max(0, row.initial_stock - row.final_stock - row.waste_stock)
-                  const totalRevenue = sold * row.unit_price
-                  return (
-                    <tr key={row.id} className="hover:bg-gray-50">
-                      <td className="py-3 font-semibold text-gray-900">{row.events?.title || "Événement"}</td>
-                      <td className="py-3 text-gray-700">{row.inventory_items?.name}</td>
-                      <td className="py-3 text-center text-gray-600">{row.initial_stock} / {row.final_stock}</td>
-                      <td className="py-3 text-center font-bold text-purple-700">{sold}</td>
-                      <td className="py-3 text-right font-bold text-gray-900">{totalRevenue.toFixed(2)} €</td>
-                    </tr>
-                  )
-                })
+                eventInventories.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-gray-50">
+                    <td className="py-3 font-semibold text-gray-900">{inv.events?.title || 'Événement'}</td>
+                    <td className="py-3 text-gray-700">{inv.inventory_items?.name || 'Article'}</td>
+                    <td className="py-3 text-center text-gray-600">
+                      {inv.initial_stock} → <strong className="text-purple-700">{inv.final_stock}</strong> {inv.inventory_items?.unit}
+                    </td>
+                    <td className="py-3 text-center font-bold text-gray-800">
+                      {inv.sold_quantity} {inv.inventory_items?.unit}
+                    </td>
+                    <td className="py-3 text-right font-extrabold text-green-700">
+                      {inv.total_revenue?.toFixed(2)} €
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
