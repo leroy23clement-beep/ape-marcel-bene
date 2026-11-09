@@ -1,181 +1,41 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wine, Calculator, Store } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { revalidatePath } from "next/cache";
+import ManifestationsManagement from "@/components/ManifestationsManagement";
 
-async function saveEventInventory(formData: FormData) {
-  "use server";
+export default async function BureauManifestationsPage() {
   const supabase = await createClient();
-  const event_id = formData.get("event_id") as string;
-  const item_id = formData.get("item_id") as string;
-  const initial_stock = parseInt(formData.get("initial_stock") as string, 10) || 0;
-  const final_stock = parseInt(formData.get("final_stock") as string, 10) || 0;
-  const waste_stock = parseInt(formData.get("waste_stock") as string, 10) || 0;
-  const unit_price = parseFloat(formData.get("unit_price") as string) || 0;
 
-  const { error } = await supabase.from("event_inventory").insert({
-    event_id,
-    item_id,
-    initial_stock,
-    final_stock,
-    waste_stock,
-    unit_price,
-  });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!error) {
-    revalidatePath("/bureau/manifestations");
+  if (!user) {
+    redirect("/login");
   }
-}
 
-export default async function ManifestationsPage() {
-  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  const allowedRoles = ["admin", "bureau", "tresorier", "secretaire", "president"];
+  const allowedRoles = ["admin", "tresorier", "secretaire", "bureau", "president"];
   const userRole = profile?.role ? profile.role.toLowerCase() : "parent";
-  if (!allowedRoles.includes(userRole)) redirect("/dashboard");
 
-  // Récupérer les événements et le catalogue d'articles
-  const { data: events } = await supabase.from("events").select("*").order("event_date", { ascending: false });
-  const { data: items } = await supabase.from("inventory_items").select("*").order("name", { ascending: true });
-  const { data: eventInventory } = await supabase
-    .from("event_inventory")
-    .select("*, events(title), inventory_items(name, unit)");
+  if (!profile || !allowedRoles.includes(userRole)) {
+    redirect("/dashboard");
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
-
-      <main className="container mx-auto max-w-5xl space-y-8 p-6">
-        <div className="flex flex-col gap-2 border-b pb-4">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Buvette & Bilans d'Événements</h1>
-          <p className="text-sm text-gray-600">
-            Saisissez l'inventaire emporté/rapporté pour chaque manifestation et suivez les recettes réelles.
-          </p>
-        </div>
-
-        {/* Formulaire de saisie d'inventaire d'événement */}
-        <Card className="bg-white shadow-sm border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
-              <Wine className="size-5 text-emerald-600" />
-              Saisir un article pour une manifestation
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={saveEventInventory} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="event_id">Événement</Label>
-                  <select
-                    id="event_id"
-                    name="event_id"
-                    required
-                    className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                  >
-                    <option value="">Sélectionner un événement</option>
-                    {events?.map((ev: any) => (
-                      <option key={ev.id} value={ev.id}>{ev.title}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="item_id">Article buvette / restauration</Label>
-                  <select
-                    id="item_id"
-                    name="item_id"
-                    required
-                    className="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                  >
-                    <option value="">Sélectionner un article</option>
-                    {items?.map((it: any) => (
-                      <option key={it.id} value={it.id}>{it.name} (Réserve: {it.current_stock})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <Label htmlFor="initial_stock">Stock Initial (pris)</Label>
-                  <Input id="initial_stock" name="initial_stock" type="number" min="0" defaultValue="0" required className="mt-1" />
-                </div>
-                <div>
-                  <Label htmlFor="final_stock">Stock Final (restant)</Label>
-                  <Input id="final_stock" name="final_stock" type="number" min="0" defaultValue="0" required className="mt-1" />
-                </div>
-                <div>
-                  <Label htmlFor="waste_stock">Pertes / Offerts</Label>
-                  <Input id="waste_stock" name="waste_stock" type="number" min="0" defaultValue="0" className="mt-1" />
-                </div>
-                <div>
-                  <Label htmlFor="unit_price">Prix Vente Unitaire (€)</Label>
-                  <Input id="unit_price" name="unit_price" type="number" step="0.10" placeholder="ex: 1.50" required className="mt-1" />
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-                Enregistrer le bilan de cet article
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Tableau résumé des ventes et caisse */}
-        <Card className="bg-white shadow-sm border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl text-gray-800">
-              <Calculator className="size-6 text-emerald-600" />
-              Récapitulatif des Ventes par Manifestation
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b text-sm text-gray-500">
-                    <th className="pb-3 font-medium">Événement</th>
-                    <th className="pb-3 font-medium">Article</th>
-                    <th className="pb-3 font-medium text-center">Pris / Restant</th>
-                    <th className="pb-3 font-medium text-center">Vendus</th>
-                    <th className="pb-3 font-medium text-right">CA Théorique</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {eventInventory?.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-6 text-center text-gray-500 italic">
-                        Aucun bilan de buvette enregistré pour le moment.
-                      </td>
-                    </tr>
-                  ) : (
-                    eventInventory?.map((row: any) => {
-                      const sold = Math.max(0, row.initial_stock - row.final_stock - row.waste_stock);
-                      const totalRevenue = sold * row.unit_price;
-                      return (
-                        <tr key={row.id} className="hover:bg-gray-50 text-sm">
-                          <td className="py-3 font-semibold text-gray-900">{row.events?.title || "Événement"}</td>
-                          <td className="py-3 text-gray-700">{row.inventory_items?.name}</td>
-                          <td className="py-3 text-center text-gray-600">{row.initial_stock} / {row.final_stock}</td>
-                          <td className="py-3 text-center font-bold text-emerald-700">{sold}</td>
-                          <td className="py-3 text-right font-bold text-gray-900">{totalRevenue.toFixed(2)} €</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar 
+        userEmail={user.email} 
+        firstName={profile?.first_name} 
+        role={profile?.role} 
+      />
+      <main className="py-6">
+        <ManifestationsManagement />
       </main>
     </div>
   );
