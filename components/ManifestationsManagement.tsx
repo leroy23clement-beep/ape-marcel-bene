@@ -87,22 +87,14 @@ export default function ManifestationsManagement() {
       return
     }
 
-    // Vérifier si tous les articles sélectionnés ont bien un prix de vente valide
-    for (const item of itemsToSave) {
-      const row = rowsData[item.id]
-      const price = row.price !== '' ? parseFloat(row.price) : (lastPrices[item.id] || 0)
-      if (isNaN(price) || price <= 0) {
-        alert(`Le prix de vente unitaire est requis et doit être supérieur à 0 pour l'article : ${item.name}`)
-        return
-      }
-    }
-
     for (const item of itemsToSave) {
       const row = rowsData[item.id]
       const initialStockBeforeEvent = item.current_stock
       const final = parseInt(row.finalStock, 10)
       const waste = parseInt(row.waste, 10) || 0
-      const price = row.price !== '' ? parseFloat(row.price) : lastPrices[item.id]
+      
+      // Le prix n'est plus obligatoire (vaut 0 s'il n'est ni saisi ni trouvé dans l'historique)
+      const price = row.price !== '' ? parseFloat(row.price) : (lastPrices[item.id] || 0)
 
       const sold = Math.max(0, initialStockBeforeEvent - final - waste)
       const revenue = sold * price
@@ -149,7 +141,7 @@ export default function ManifestationsManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Buvette & Bilans d'Événements</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Remplissez le tableau des restes et validez tout en une seule fois.
+          Remplissez le tableau des restes et validez tout en une seule fois. Le prix de vente est optionnel.
         </p>
       </header>
 
@@ -186,7 +178,7 @@ export default function ManifestationsManagement() {
                 <th className="p-3 text-center">Stock Réserve Actuel</th>
                 <th className="p-3 text-center">Stock Final Restant</th>
                 <th className="p-3 text-center">Pertes / Offerts</th>
-                <th className="p-3 text-right">Prix Vente Unitaire (€)</th>
+                <th className="p-3 text-right">Prix Vente Unitaire (€) (Optionnel)</th>
               </tr>
             </thead>
             <tbody className="divide-y text-sm">
@@ -234,7 +226,7 @@ export default function ManifestationsManagement() {
                           type="number"
                           step="0.01"
                           min="0"
-                          placeholder={lastPrices[item.id] !== undefined ? `${lastPrices[item.id]} €` : "ex: 1.50"}
+                          placeholder={lastPrices[item.id] !== undefined ? `${lastPrices[item.id]} €` : "optionnel"}
                           value={defaultPriceDisplay}
                           onChange={(e) => handleInputChange(item.id, 'price', e.target.value)}
                           className="w-28 ml-auto rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
