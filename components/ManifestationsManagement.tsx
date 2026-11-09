@@ -1,4 +1,3 @@
-'app/client'
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -12,46 +11,66 @@ export default function ManifestationsManagement() {
   const [loading, setLoading] = useState(true)
   const [dbError, setDbError] = useState<string | null>(null)
 
-  // Champs du formulaire simplifié
+  // Sélection de l'événement
   const [selectedEventId, setSelectedEventId] = useState('')
-  const [selectedItemId, setSelectedItemId] = useState('')
-  const [finalStock, setFinalStock] = useState('')
-  const [wasteStock, setWasteStock] = useState('0')
-  const [salePrice, setSalePrice] = useState('')
+
+  // État local pour stocker les saisies du tableau (clé = item_id, valeur = { finalStock, waste, price })
+  const [rowsData, setRowsData] = useState<Record<string, { finalStock: string; waste: string; price: string }>>({})
+  const [lastPrices, setLastPrices] = useState<Record<string, number>>({})
 
   const loadData = async () => {
     setLoading(true)
     setDbError(null)
 
-    // 1. Récupération des événements (sans tri par .date pour éviter tout blocage de colonne)
+    // 1. Récupération des événements
     const { data: eventsData, error: evError } = await supabase
       .from('events')
       .select('*')
 
     if (evError) {
-      console.error("Erreur events:", evError)
       setDbError(`Erreur table events: ${evError.message}`)
     } else {
       setEvents(eventsData || [])
     }
     
-    // 2. Récupération des articles
+    // 2. Récupération des articles de la réserve
     const { data: itemsData, error: itError } = await supabase
       .from('inventory_items')
       .select('*')
       .order('name', { ascending: true })
 
     if (itError) console.error("Erreur items:", itError)
-    if (itemsData) setItems(itemsData)
     
-    // 3. Récupération de l'historique des bilans
+    if (itemsData) {
+      setItems(itemsData)
+      // Initialisation par défaut des lignes du tableau
+      const initialRows: Record<string, { finalStock: string; waste: string; price: string }> = {}
+      itemsData.forEach(item => {
+        initialRows[item.id] = { finalStock: '', waste: '0', price: '' }
+      })
+      setRowsData(initialRows)
+    }
+    
+    // 3. Récupération de l'historique des bilans (pour récupérer les derniers prix de vente utilisés)
     const { data: inventoryData, error: invError } = await supabase
       .from('event_inventory')
       .select('*, events(title), inventory_items(name, unit)')
       .order('id', { ascending: false })
 
     if (invError) console.error("Erreur inventory:", invError)
-    if (inventoryData) setEventInventories(inventoryData)
+    
+    if (inventoryData) {
+      setEventInventories(inventoryData)
+
+      // Extraire le dernier prix de vente connu pour chaque article
+      const pricesMap: Record<string, number> = {}
+      inventoryData.forEach((inv) => {
+        if (inv.item_id && inv.unit_price && !pricesMap[inv.item_id]) {
+          pricesMap[inv.item_id] = inv.unit_price
+        }
+      })
+      setLastPrices(pricesMap)
+    }
     
     setLoading(false)
   }
@@ -60,67 +79,81 @@ export default function ManifestationsManagement() {
     loadData()
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedEventId || !selectedItemId || finalStock === '' || !salePrice) return
-
-    const currentItem = items.find(i => i.id === selectedItemId)
-    if (!currentItem) return
-
-    const initialStockBeforeEvent = currentItem.current_stock
-    const final = parseInt(finalStock, 10)
-    const waste = parseInt(wasteStock, 10) || 0
-    const price = parseFloat(salePrice)
-
-    const sold = Math.max(0, initialStockBeforeEvent - final - waste)
-    const revenue = sold * price
-
-    const { error: insertError } = await supabase.from('event_inventory').insert({
-      event_id: selectedEventId,
-      item_id: selectedItemId,
-      initial_stock: initialStockBeforeEvent,
-      final_stock: final,
-      waste_stock: waste,
-      sold_quantity: sold,
-      unit_price: price,
-      total_revenue: revenue
-    })
-
-    if (insertError) {
-      alert("Erreur lors de l'enregistrement du bilan.")
-      return
-    }
-
-    const { error: updateError } = await supabase
-      .from('inventory_items')
-      .update({ current_stock: final })
-      .eq('id', selectedItemId)
-
-    if (updateError) {
-      alert("Erreur lors de la mise à jour du stock global.")
-      return
-    }
-
-    setSelectedEventId('')
-    setSelectedItemId('')
-    setFinalStock('')
-    setWasteStock('0')
-    setSalePrice('')
-    loadData()
+  // Mettre à jour un champ spécifique d'un article dans le tableau
+  const handleInputChange = (itemId: string, field: 'finalStock' | 'waste' | 'price', value: string) => {
+    setRowsData(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: value
+      }
+    }))
   }
 
-  const selectedItemData = items.find(i => i.id === selectedItemId)
+  // Validation globale de tout le bilan d'un coup
+  const handleSubmitAll = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedEventId) {
+      alert("Veuillez sélectionner un événement.")
+      return
+    }
+
+    // Filtrer uniquement les articles pour lesquels l'utilisateur a saisi un stock final
+    const itemsToSave = items.filter(item => {
+      const row = rowsData[item.id]
+      return row && row.finalStock !== ''
+    })
+
+    if (itemsToSave.length === 0) {
+      alert("Veuillez saisir au moins un stock final restant.")
+      return
+    }
+
+    for (const item of itemsToSave) {
+      const row = rowsData[item.id]
+      const initialStockBeforeEvent = item.current_stock
+      const final = parseInt(row.finalStock, 10)
+      const waste = parseInt(row.waste, 10) || 0
+      
+      // Utiliser le prix saisi ou retomber sur le dernier prix connu, ou 0 par défaut
+      const price = row.price !== '' ? parseFloat(row.price) : (lastPrices[item.id] || 0)
+
+      const sold = Math.max(0, initialStockBeforeEvent - final - waste)
+      const revenue = sold * price
+
+      // 1. Enregistrer dans event_inventory
+      await supabase.from('event_inventory').insert({
+        event_id: selectedEventId,
+        item_id: item.id,
+        initial_stock: initialStockBeforeEvent,
+        final_stock: final,
+        waste_stock: waste,
+        sold_quantity: sold,
+        unit_price: price,
+        total_revenue: revenue
+      })
+
+      // 2. Mettre à jour le stock global dans inventory_items
+      await supabase
+        .from('inventory_items')
+        .update({ current_stock: final })
+        .eq('id', item.id)
+    }
+
+    alert("Bilan de l'événement enregistré avec succès et stocks mis à jour !")
+    loadData()
+  }
 
   if (loading) {
     return <div className="text-center py-12 text-gray-500 text-sm">Chargement des bilans de manifestations...</div>
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Buvette & Bilans d'Événements</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Sélectionnez l'événement, saisissez le stock final restant et déduisez automatiquement les ventes.
+          Sélectionnez l'événement, remplissez le tableau des restes en un clin d'œil, et validez tout en une seule fois.
         </p>
       </header>
 
@@ -130,105 +163,106 @@ export default function ManifestationsManagement() {
         </div>
       )}
 
-      {/* Formulaire Simplifié */}
-      <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
-        <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
-          <span>🥤</span> Saisie du Bilan par Article
-        </h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Événement</label>
-              <select
-                value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-              >
-                <option value="">Sélectionner un événement ({events.length} dispo)</option>
-                {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.title || ev.name || 'Événement sans nom'}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {/* Formulaire Global en Tableau */}
+      <form onSubmit={handleSubmitAll} className="bg-white border rounded-xl p-6 shadow-sm space-y-6">
+        <div className="max-w-md">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Événement concerné</label>
+          <select
+            value={selectedEventId}
+            onChange={(e) => setSelectedEventId(e.target.value)}
+            required
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+          >
+            <option value="">Sélectionner un événement ({events.length} dispo)</option>
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                {ev.title || ev.name || 'Événement sans nom'}
+              </option>
+            ))}
+          </select>
+        </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Article</label>
-              <select
-                value={selectedItemId}
-                onChange={(e) => setSelectedItemId(e.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-              >
-                <option value="">Sélectionner un article</option>
-                {items.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} (En réserve : {item.current_stock} {item.unit})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b text-xs font-bold text-gray-500 uppercase tracking-wider bg-gray-50">
+                <th className="p-3">Article</th>
+                <th className="p-3">Catégorie</th>
+                <th className="p-3 text-center">Stock Réserve Actuel</th>
+                <th className="p-3 text-center">Stock Final Restant</th>
+                <th className="p-3 text-center">Pertes / Offerts</th>
+                <th className="p-3 text-right">Prix Vente Unitaire (€)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y text-sm">
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-gray-500 italic">
+                    Aucun article dans la réserve. Ajoutez des articles dans le module Stock avant de faire un bilan.
+                  </td>
+                </tr>
+              ) : (
+                items.map((item) => {
+                  const row = rowsData[item.id] || { finalStock: '', waste: '0', price: '' }
+                  // Prix par défaut : soit ce que l'utilisateur tape, soit le dernier prix connu, soit vide
+                  const defaultPriceDisplay = row.price !== '' ? row.price : (lastPrices[item.id] !== undefined ? lastPrices[item.id] : '')
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Stock Final Restant <span className="text-purple-700 font-bold">*</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                placeholder="ex: 12"
-                value={finalStock}
-                onChange={(e) => setFinalStock(e.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              {selectedItemData && (
-                <p className="text-[11px] text-gray-500 mt-1">
-                  Stock actuel en réserve : <strong className="text-gray-800">{selectedItemData.current_stock} {selectedItemData.unit}</strong>
-                </p>
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="p-3 font-semibold text-gray-900">{item.name}</td>
+                      <td className="p-3 text-gray-600 text-xs">{item.category}</td>
+                      <td className="p-3 text-center">
+                        <span className="bg-gray-100 text-gray-800 font-bold px-2 py-1 rounded text-xs">
+                          {item.current_stock} {item.unit}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="laisser vide si inchangé"
+                          value={row.finalStock}
+                          onChange={(e) => handleInputChange(item.id, 'finalStock', e.target.value)}
+                          className="w-32 mx-auto rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </td>
+                      <td className="p-3 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={row.waste}
+                          onChange={(e) => handleInputChange(item.id, 'waste', e.target.value)}
+                          className="w-20 mx-auto rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </td>
+                      <td className="p-3 text-right">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder={lastPrices[item.id] !== undefined ? `${lastPrices[item.id]} € (dernier)` : "ex: 1.50"}
+                          value={defaultPriceDisplay}
+                          onChange={(e) => handleInputChange(item.id, 'price', e.target.value)}
+                          className="w-28 ml-auto rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </td>
+                    </tr>
+                  )
+                })
               )}
-            </div>
+            </tbody>
+          </table>
+        </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Pertes / Offerts (Casse, etc.)</label>
-              <input
-                type="number"
-                min="0"
-                placeholder="ex: 2"
-                value={wasteStock}
-                onChange={(e) => setWasteStock(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Prix de vente unitaire (€)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="ex: 1.50"
-                value={salePrice}
-                onChange={(e) => setSalePrice(e.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-          </div>
-
+        <div className="pt-4 border-t flex justify-end">
           <button
             type="submit"
-            className="w-full bg-purple-700 hover:bg-purple-800 text-white font-medium text-sm py-2.5 px-4 rounded-xl transition cursor-pointer"
+            className="bg-purple-700 hover:bg-purple-800 text-white font-medium text-sm py-3 px-6 rounded-xl transition cursor-pointer shadow-sm"
           >
-            Enregistrer le bilan & mettre à jour le stock
+            Enregistrer tout le bilan & mettre à jour les stocks
           </button>
-        </form>
-      </div>
+        </div>
+      </form>
 
       {/* Historique des Ventes et Recettes Calculées */}
       <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
