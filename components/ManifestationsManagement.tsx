@@ -18,26 +18,31 @@ export default function ManifestationsManagement() {
   const [salePrice, setSalePrice] = useState('')
 
   const loadData = async () => {
-    // Récupération de tous les événements triés par date décroissante
-    const { data: eventsData } = await supabase.from('events').select('*').order('date', { ascending: false })
+    // Récupération de tous les événements
+    const { data: eventsData, error: evError } = await supabase
+      .from('events')
+      .select('*')
+      .order('date', { ascending: false })
+
+    if (evError) console.error("Erreur chargement events:", evError)
     
-    // Récupération des articles (avec leur stock global actuel)
-    const { data: itemsData } = await supabase.from('inventory_items').select('*').order('name', { ascending: true })
+    // Récupération des articles
+    const { data: itemsData, error: itError } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .order('name', { ascending: true })
+
+    if (itError) console.error("Erreur chargement items:", itError)
     
-    // Récupération de l'historique des bilans enregistrés
-    const { data: inventoryData } = await supabase
+    // Récupération de l'historique des bilans
+    const { data: inventoryData, error: invError } = await supabase
       .from('event_inventory')
       .select('*, events(title), inventory_items(name, unit)')
       .order('id', { ascending: false })
 
-    if (eventsData) {
-      // Filtrer pour ne garder que les événements passés (date inférieure ou égale à aujourd'hui)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const pastEvents = eventsData.filter(ev => new Date(ev.date) <= today)
-      setEvents(pastEvents)
-    }
+    if (invError) console.error("Erreur chargement inventory:", invError)
 
+    if (eventsData) setEvents(eventsData)
     if (itemsData) setItems(itemsData)
     if (inventoryData) setEventInventories(inventoryData)
     
@@ -108,7 +113,7 @@ export default function ManifestationsManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Buvette & Bilans d'Événements</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Sélectionnez un événement passé, saisissez le stock final restant et déduisez automatiquement les ventes.
+          Sélectionnez l'événement, saisissez le stock final restant et déduisez automatiquement les ventes.
         </p>
       </header>
 
@@ -121,17 +126,17 @@ export default function ManifestationsManagement() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Événement passé</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Événement</label>
               <select
                 value={selectedEventId}
                 onChange={(e) => setSelectedEventId(e.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
               >
-                <option value="">Sélectionner un événement passé</option>
+                <option value="">Sélectionner un événement ({events.length} dispo)</option>
                 {events.map((ev) => (
                   <option key={ev.id} value={ev.id}>
-                    {ev.title} ({new Date(ev.date).toLocaleDateString('fr-FR')})
+                    {ev.title} ({ev.date ? new Date(ev.date).toLocaleDateString('fr-FR') : 'Date non définie'})
                   </option>
                 ))}
               </select>

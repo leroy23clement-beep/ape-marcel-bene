@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Html5Qrcode } from 'html5-qrcode'
 
 export default function StocksManagement() {
   const supabase = createClient()
@@ -14,6 +15,7 @@ export default function StocksManagement() {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('Buvette')
   const [unit, setUnit] = useState('unité')
+  const [barcode, setBarcode] = useState('')
 
   // Champs formulaire achat
   const [selectedItemId, setSelectedItemId] = useState('')
@@ -22,14 +24,20 @@ export default function StocksManagement() {
   const [supplier, setSupplier] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
 
+  // État pour l'édition rapide du code-barres d'un article existant
+  const [editingBarcodeId, setEditingBarcodeId] = useState<string | null>(null)
+  const [tempBarcode, setTempBarcode] = useState('')
+
+  // État du scanner
+  const [isScanning, setIsScanning] = useState(false)
+  const scannerRef = useRef<Html5Qrcode | null>(null)
+
   const loadInventory = async () => {
-    // Récupération du catalogue
     const { data: itemsData } = await supabase
       .from('inventory_items')
       .select('*')
       .order('category', { ascending: true })
 
-    // Récupération des lots d'achats avec leurs dates de péremption
     const { data: purchasesData } = await supabase
       .from('inventory_purchases')
       .select('*')
@@ -42,6 +50,9 @@ export default function StocksManagement() {
 
   useEffect(() => {
     loadInventory()
+    return () => {
+      stopScanner()
+    }
   }, [])
 
   const handleAddItem = async (e: React.FormEvent) => {
@@ -52,11 +63,13 @@ export default function StocksManagement() {
       name,
       category,
       unit,
+      barcode: barcode || null,
       current_stock: 0
     })
 
     if (!error) {
       setName('')
+      setBarcode('')
       loadInventory()
     }
   }
@@ -87,8 +100,65 @@ export default function StocksManagement() {
     }
   }
 
+  // Mettre à jour le code-barres d'un article existant
+  const handleUpdateBarcode = async (itemId: string) => {
+    const { error } = await supabase
+      .from('inventory_items')
+      .update({ barcode: tempBarcode || null })
+      .eq('id', itemId)
+
+    if (!error) {
+      setEditingBarcodeId(null)
+      setTempBarcode('')
+      loadInventory()
+    } else {
+      alert("Erreur lors de la mise à jour du code-barres.")
+    }
+  }
+
+  // Scanner de code-barres
+  const startScanner = async () => {
+    setIsScanning(true)
+    setTimeout(async () => {
+      try {
+        const html5QrCode = new Html5Qrcode("reader")
+        scannerRef.current = html5QrCode
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 100 } },
+          (decodedText) => {
+            stopScanner()
+            const foundItem = items.find(i => i.barcode === decodedText)
+            if (foundItem) {
+              setSelectedItemId(foundItem.id)
+              alert(`Article reconnu : ${foundItem.name}`)
+            } else {
+              alert(`Aucun article associé au code-barres : ${decodedText}. Vous pouvez l'ajouter en cliquant sur la flèche de l'article dans le tableau ci-dessous.`)
+            }
+          },
+          () => {}
+        )
+      } catch (err) {
+        console.error("Erreur caméra:", err)
+        setIsScanning(false)
+      }
+    }, 100)
+  }
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop()
+        scannerRef.current.clear()
+      } catch (e) {}
+      scannerRef.current = null
+    }
+    setIsScanning(false)
+  }
+
   const toggleExpand = (itemId: string) => {
     setExpandedItemId(expandedItemId === itemId ? null : itemId)
+    setEditingBarcodeId(null)
   }
 
   const calculatedTotal = (quantity && unitPrice) ? (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) : '0.00'
@@ -102,7 +172,7 @@ export default function StocksManagement() {
       <header className="border-b pb-4">
         <h1 className="text-2xl font-bold text-gray-900">Gestion de la Réserve & Achats</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Suivez les stocks globaux, enregistrez les réassorts et consultez le détail des lots par date de péremption.
+          Scannez vos produits lors des courses, gérez les codes-barres et suivez les lots.
         </p>
       </header>
 
@@ -126,25 +196,37 @@ export default function StocksManagement() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Catégorie</label>
-              <input
-                type="text"
-                placeholder="ex: Buvette, Restauration"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Catégorie</label>
+                <input
+                  type="text"
+                  placeholder="ex: Buvette"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Unité</label>
+                <input
+                  type="text"
+                  placeholder="ex: unité, pack"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Unité</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Code-barres (Optionnel)</label>
               <input
                 type="text"
-                placeholder="ex: unité, pack, kg"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                required
+                placeholder="ex: 5449000000996"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
@@ -159,9 +241,32 @@ export default function StocksManagement() {
 
         {/* Formulaire Enregistrer un Achat */}
         <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
-          <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
-            <span>🛒</span> Enregistrer un achat / réassort
-          </h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <span>🛒</span> Enregistrer un achat
+            </h2>
+            <button
+              type="button"
+              onClick={isScanning ? stopScanner : startScanner}
+              className="bg-purple-100 hover:bg-purple-200 text-purple-800 font-medium text-xs py-1.5 px-3 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>📷</span> {isScanning ? "Fermer la caméra" : "Scanner un code-barres"}
+            </button>
+          </div>
+
+          {isScanning && (
+            <div className="bg-black rounded-lg overflow-hidden p-2 relative">
+              <div id="reader" className="w-full"></div>
+              <button
+                type="button"
+                onClick={stopScanner}
+                className="mt-2 w-full bg-red-600 text-white text-xs py-1 rounded font-medium"
+              >
+                Arrêter le scan
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleAddPurchase} className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Article</label>
@@ -171,21 +276,22 @@ export default function StocksManagement() {
                 required
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
               >
-                <option value="">Sélectionner un article</option>
+                <option value="">Sélectionner ou scanner un article</option>
                 {items.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name} (Stock actuel : {item.current_stock} {item.unit})
+                    {item.name} {item.barcode ? `(🔍 ${item.barcode})` : ''} (Stock : {item.current_stock} {item.unit})
                   </option>
                 ))}
               </select>
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Quantité</label>
                 <input
                   type="number"
                   min="1"
-                  placeholder="ex: 97"
+                  placeholder="ex: 24"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   required
@@ -215,7 +321,7 @@ export default function StocksManagement() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Fournisseur</label>
                 <input
                   type="text"
-                  placeholder="ex: Métro, E.Leclerc"
+                  placeholder="ex: Métro"
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -231,6 +337,7 @@ export default function StocksManagement() {
                 />
               </div>
             </div>
+
             <button
               type="submit"
               className="w-full bg-purple-700 hover:bg-purple-800 text-white font-medium text-sm py-2 px-4 rounded-xl transition cursor-pointer"
@@ -241,10 +348,10 @@ export default function StocksManagement() {
         </div>
       </div>
 
-      {/* Tableau Réserve avec Sous-Détail Dépliable */}
+      {/* Tableau Réserve avec Gestion des Code-Barres dans l'accordéon */}
       <div className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
         <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
-          <span>📊</span> État de la Réserve Actuelle & Détail des Lots
+          <span>📊</span> État de la Réserve & Gestion des Codes-Barres
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -253,6 +360,7 @@ export default function StocksManagement() {
                 <th className="pb-3 w-8"></th>
                 <th className="pb-3">Article</th>
                 <th className="pb-3">Catégorie</th>
+                <th className="pb-3">Code-barres</th>
                 <th className="pb-3 text-center">Stock Global</th>
                 <th className="pb-3">Unité</th>
               </tr>
@@ -260,8 +368,8 @@ export default function StocksManagement() {
             <tbody className="divide-y text-sm">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-gray-500 italic">
-                    Aucun article dans la réserve pour le moment.
+                  <td colSpan={6} className="py-6 text-center text-gray-500 italic">
+                    Aucun article dans la réserve.
                   </td>
                 </tr>
               ) : (
@@ -271,13 +379,12 @@ export default function StocksManagement() {
 
                   return (
                     <tr key={item.id} className="contents">
-                      {/* Ligne Principale */}
                       <tr 
                         className={`hover:bg-gray-50 cursor-pointer transition ${isExpanded ? 'bg-purple-50/50' : ''}`}
                         onClick={() => toggleExpand(item.id)}
                       >
                         <td className="py-3 text-center font-bold text-gray-400">
-                          {itemPurchases.length > 0 ? (isExpanded ? '▼' : '▶') : ''}
+                          {isExpanded ? '▼' : '▶'}
                         </td>
                         <td className="py-3 font-semibold text-gray-900 flex items-center gap-2">
                           {item.name}
@@ -288,6 +395,13 @@ export default function StocksManagement() {
                           )}
                         </td>
                         <td className="py-3 text-gray-600">{item.category}</td>
+                        <td className="py-3 text-gray-500 font-mono text-xs">
+                          {item.barcode ? (
+                            <span className="bg-gray-100 px-2 py-1 rounded text-gray-700">{item.barcode}</span>
+                          ) : (
+                            <span className="italic text-gray-400">Non associé</span>
+                          )}
+                        </td>
                         <td className="py-3 text-center">
                           <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${item.current_stock > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                             {item.current_stock}
@@ -296,13 +410,61 @@ export default function StocksManagement() {
                         <td className="py-3 text-gray-600">{item.unit}</td>
                       </tr>
 
-                      {/* Sous-détail dépliable des lots */}
+                      {/* Zone d'expansion : Code-barres modifiable + lots de péremption */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan={5} className="bg-gray-50 p-4 border-y">
+                          <td colSpan={6} className="bg-gray-50 p-4 border-y space-y-4">
+                            
+                            {/* Bloc Gestion Code-Barres pour cet article existant */}
+                            <div className="bg-white rounded-lg border p-3 flex flex-col sm:flex-row justify-between items-center gap-3">
+                              <div className="text-xs space-y-0.5">
+                                <span className="font-bold text-gray-700">Code-barres associé :</span>
+                                <p className="text-gray-500">Permet de reconnaître l'article automatiquement lors du scan des courses.</p>
+                              </div>
+                              
+                              {editingBarcodeId === item.id ? (
+                                <div className="flex gap-2 items-center w-full sm:w-auto">
+                                  <input
+                                    type="text"
+                                    placeholder="Entrer le code-barres"
+                                    value={tempBarcode}
+                                    onChange={(e) => setTempBarcode(e.target.value)}
+                                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateBarcode(item.id)}
+                                    className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium"
+                                  >
+                                    Enregistrer
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingBarcodeId(null)}
+                                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-3 py-1.5 rounded-lg font-medium"
+                                  >
+                                    Annuler
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditingBarcodeId(item.id)
+                                    setTempBarcode(item.barcode || '')
+                                  }}
+                                  className="bg-purple-100 hover:bg-purple-200 text-purple-800 text-xs font-medium px-3 py-1.5 rounded-lg transition"
+                                >
+                                  {item.barcode ? "Modifier le code-barres" : "+ Associer un code-barres"}
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Bloc Détail des lots achetés & péremptions */}
                             <div className="bg-white rounded-lg border p-3 space-y-2">
-                              <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                                <span>📅</span> Détail des lots achetés & Dates de péremption
+                              <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                📅 Détail des lots achetés & Péremptions
                               </h4>
                               {itemPurchases.length === 0 ? (
                                 <p className="text-xs text-gray-500 italic">Aucun lot enregistré pour cet article.</p>
@@ -310,10 +472,10 @@ export default function StocksManagement() {
                                 <table className="w-full text-left border-collapse text-xs">
                                   <thead>
                                     <tr className="border-b text-gray-400 uppercase">
-                                      <th className="py-1">Date d'achat / Péremption</th>
-                                      <th className="py-1 text-center">Quantité Achetée</th>
+                                      <th className="py-1">Péremption / Statut</th>
+                                      <th className="py-1 text-center">Quantité</th>
                                       <th className="py-1">Fournisseur</th>
-                                      <th className="py-1 text-right">Prix unitaire</th>
+                                      <th className="py-1 text-right">Prix Unitaire</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y">
@@ -348,6 +510,7 @@ export default function StocksManagement() {
                                 </table>
                               )}
                             </div>
+
                           </td>
                         </tr>
                       )}
