@@ -129,7 +129,11 @@ export function missingVapidVars(): string[] {
 export function vapidErrorMessage(): string {
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'inconnu'
   const env = process.env.VERCEL_ENV ?? 'local'
-  return `Variable(s) manquante(s) : ${missingVapidVars().join(', ')} (déploiement ${commit}, ${env}). Ajoute-la dans Vercel puis redéploie.`
+  // Noms seulement, jamais les valeurs : permet de repérer une faute de frappe ou un espace
+  const seen = Object.keys(process.env).filter((name) => /vapid/i.test(name))
+  return `Variable(s) manquante(s) : ${missingVapidVars().join(', ')} (déploiement ${commit}, ${env}). Variables VAPID visibles : ${
+    seen.length ? seen.map((n) => JSON.stringify(n)).join(', ') : 'aucune'
+  }.`
 }
 
 export function configureWebPush(): boolean {
