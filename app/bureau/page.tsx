@@ -14,7 +14,7 @@ export default function BureauPage() {
   const [whatsappStats, setWhatsappStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
-  // Enregistrement automatique du push pour cet appareil/utilisateur
+  // Enregistrement automatique du push adapté à la table push_subscriptions (colonne subscription jsonb)
   useEffect(() => {
     async function registerPushSubscription(currentUser: any) {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
@@ -33,17 +33,15 @@ export default function BureauPage() {
           applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
         })
 
-        const p256dh = subscription.getKey('p256dh')
-        const auth = subscription.getKey('auth')
+        const subJson = subscription.toJSON()
 
-        if (p256dh && auth) {
-          await supabase.from('push_subscriptions').upsert({
-            endpoint: subscription.endpoint,
-            p256dh: btoa(String.fromCharCode.apply(null, new Uint8Array(p256dh))),
-            auth: btoa(String.fromCharCode.apply(null, new Uint8Array(auth))),
-            user_id: currentUser.id,
-          }, { onConflict: 'endpoint' })
-        }
+        // Insertion dans Supabase avec la structure correcte (endpoint + objet subscription jsonb)
+        await supabase.from('push_subscriptions').upsert({
+          user_id: currentUser.id,
+          endpoint: subscription.endpoint,
+          subscription: subJson,
+        }, { onConflict: 'endpoint' })
+
       } catch (err) {
         console.error("Erreur d'enregistrement push automatique :", err)
       }
