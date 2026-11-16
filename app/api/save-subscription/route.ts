@@ -25,10 +25,12 @@ function parseSubscription(value: Record<string, unknown>): CleanSubscription | 
 /**
  * Enregistre l'abonnement push de l'appareil courant.
  *
- * Correction : `onConflict: 'user_id'` écrasait l'abonnement du téléphone quand
- * la même personne activait les notifications sur son ordinateur, et le corps
- * de la requête (JSON du navigateur, sans `user_id`) était inséré tel quel.
- * On s'appuie désormais sur `endpoint` (une ligne par appareil).
+ * Correction : le corps de la requête (JSON du navigateur, sans `user_id`)
+ * était inséré tel quel ; on écrit maintenant un objet maîtrisé.
+ *
+ * On reste sur `onConflict: 'user_id'` : `endpoint` est une colonne
+ * **générée** dans Supabase (`subscription->>'endpoint'`), donc non inscriptible.
+ * Conséquence assumée : une personne = un appareil notifié (le dernier activé).
  */
 export async function POST(request: Request) {
   try {
@@ -50,10 +52,9 @@ export async function POST(request: Request) {
     const { error } = await supabase.from('push_subscriptions').upsert(
       {
         user_id: user.id,
-        endpoint: subscription.endpoint,
         subscription,
       },
-      { onConflict: 'endpoint' }
+      { onConflict: 'user_id' }
     )
 
     if (error) throw error
