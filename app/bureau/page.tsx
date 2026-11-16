@@ -14,7 +14,41 @@ export default function BureauPage() {
   const [whatsappStats, setWhatsappStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
+  // Enregistrement automatique du push pour cet appareil/utilisateur
   useEffect(() => {
+    async function registerPushSubscription(currentUser: any) {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js')
+        await navigator.serviceWorker.ready
+
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') return
+
+        const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        if (!vapidPublicKey) return
+
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        })
+
+        const p256dh = subscription.getKey('p256dh')
+        const auth = subscription.getKey('auth')
+
+        if (p256dh && auth) {
+          await supabase.from('push_subscriptions').upsert({
+            endpoint: subscription.endpoint,
+            p256dh: btoa(String.fromCharCode.apply(null, new Uint8Array(p256dh))),
+            auth: btoa(String.fromCharCode.apply(null, new Uint8Array(auth))),
+            user_id: currentUser.id,
+          }, { onConflict: 'endpoint' })
+        }
+      } catch (err) {
+        console.error("Erreur d'enregistrement push automatique :", err)
+      }
+    }
+
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -42,6 +76,9 @@ export default function BureauPage() {
       }
 
       setLoading(false)
+
+      // Lancer l'enregistrement des notifications en arrière-plan
+      registerPushSubscription(user)
     }
     loadData()
   }, [supabase])
@@ -325,4 +362,16 @@ export default function BureauPage() {
       </main>
     </div>
   )
+}
+
+// Fonction utilitaire pour convertir la clé VAPID en Uint8Array
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
 }
