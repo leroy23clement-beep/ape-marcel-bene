@@ -1,90 +1,93 @@
+import { timingSafeEqual } from 'crypto'
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/client'
-import webpush from 'web-push'
+import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  CODIR_ROLES,
+  SECRETARIAT_ROLES,
+  configureWebPush,
+  getSubscriptions,
+  sendToSubscriptions,
+} from '@/lib/push'
+
+function isAuthorized(request: Request): boolean {
+  const secret = process.env.CRON_SECRET
+  // Sans secret configuré, on refuse tout (évite que "Bearer undefined" passe)
+  if (!secret) return false
+
+  const received = Buffer.from(request.headers.get('authorization') ?? '')
+  const expected = Buffer.from(`Bearer ${secret}`)
+  return received.length === expected.length && timingSafeEqual(received, expected)
+}
+
+/** Date AAAA-MM-JJ à Paris, avec un décalage en jours. */
+function parisDate(offsetDays: number): string {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + offsetDays)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(d)
+}
+
+/** Rôles destinataires selon la visibilité de l'événement (undefined = tout le monde, null = personne). */
+function rolesForVisibility(visibility: string): string[] | undefined | null {
+  if (visibility === 'public') return undefined
+  if (visibility === 'codir') return CODIR_ROLES
+  if (visibility === 'secretariat') return SECRETARIAT_ROLES
+  return null
+}
 
 export async function GET(request: Request) {
-  // Vérification de sécurité pour le Cron Vercel
-  const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorized(request)) {
     return new NextResponse('Non autorisé', { status: 401 })
   }
 
-  // Configuration des clés VAPID à l'intérieur de la fonction
-  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-    return NextResponse.json({ error: "Clés VAPID manquantes dans les variables d'environnement Vercel." }, { status: 500 })
+  if (!configureWebPush()) {
+    return NextResponse.json(
+      { error: "Clés VAPID manquantes dans les variables d'environnement Vercel." },
+      { status: 500 }
+    )
   }
 
-  webpush.setVapidDetails(
-    'mailto:contact@ape-marcel-bene.fr',
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  )
+  try {
+    const admin = createAdminClient()
+    const dateJ1 = parisDate(1)
+    const dateJ7 = parisDate(7)
 
-  const supabase = createClient()
-  const today = new Date()
+    const { data: events, error: eventsError } = await admin
+      .from('events')
+      .select('id, title, date, visibility')
+      .in('date', [dateJ1, dateJ7])
 
-  const d7 = new Date(today)
-  d7.setDate(today.getDate() + 7)
-  const dateJ7 = d7.toISOString().split('T')[0]
-
-  const d1 = new Date(today)
-  d1.setDate(today.getDate() + 1)
-  const dateJ1 = d1.toISOString().split('T')[0]
-
-  const { data: events, error: eventsError } = await supabase
-    .from('events')
-    .select('*')
-    .or(`date.eq.${dateJ7},date.eq.${dateJ1}`)
-
-  if (eventsError || !events || events.length === 0) {
-    return NextResponse.json({ message: 'Aucun événement concerné aujourd\'hui.' })
-  }
-
-  const { data: subscriptions, error: subError } = await supabase
-    .from('push_subscriptions')
-    .select('*')
-
-  if (subError || !subscriptions || subscriptions.length === 0) {
-    return NextResponse.json({ message: 'Aucune souscription Push enregistrée.' })
-  }
-
-  let sentCount = 0
-
-  for (const event of events) {
-    const isJ7 = event.date === dateJ7
-    const title = isJ7 ? `📅 Dans 7 jours : ${event.title}` : `⏰ Demain : ${event.title}`
-    const body = isJ7
-      ? `N'oubliez pas ! L'événement "${event.title}" aura lieu dans une semaine.`
-      : `Rappel de dernière minute pour "${event.title}". Cliquez pour revoir les détails.`
-
-    const payload = JSON.stringify({
-      title,
-      body,
-      url: `/events/${event.id}`
-    })
-
-    for (const sub of subscriptions) {
-      try {
-        const pushSubscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            auth: sub.keys_auth,
-            p256dh: sub.keys_p256dh
-          }
-        }
-        await webpush.sendNotification(pushSubscription, payload)
-        sentCount++
-      } catch (err: any) {
-        if (err.statusCode === 410 || err.statusCode === 404) {
-          await supabase.from('push_subscriptions').delete().eq('id', sub.id)
-        }
-      }
+    if (eventsError) throw eventsError
+    if (!events || events.length === 0) {
+      return NextResponse.json({ message: "Aucun événement concerné aujourd'hui." })
     }
-  }
 
-  return NextResponse.json({
-    success: true,
-    eventsProcessed: events.length,
-    notificationsSent: sentCount
-  })
+    let notificationsSent = 0
+
+    for (const event of events) {
+      const roles = rolesForVisibility(event.visibility ?? 'public')
+      if (roles === null) continue // visibilité inconnue : on n'envoie rien
+
+      const subscriptions = await getSubscriptions(admin, roles)
+      if (subscriptions.length === 0) continue
+
+      const isJ7 = event.date === dateJ7
+      const result = await sendToSubscriptions(admin, subscriptions, {
+        title: isJ7 ? `📅 Dans 7 jours : ${event.title}` : `⏰ Demain : ${event.title}`,
+        body: isJ7
+          ? `N'oubliez pas ! L'événement "${event.title}" aura lieu dans une semaine.`
+          : `Rappel de dernière minute pour "${event.title}". Cliquez pour revoir les détails.`,
+        url: `/events/${event.id}`,
+      })
+      notificationsSent += result.sent
+    }
+
+    return NextResponse.json({
+      success: true,
+      eventsProcessed: events.length,
+      notificationsSent,
+    })
+  } catch (err) {
+    console.error('Erreur cron rappels :', err)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
 }
