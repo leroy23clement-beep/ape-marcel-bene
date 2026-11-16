@@ -43,11 +43,11 @@ export default function PushNotificationTester() {
 
       const subJson = subscription.toJSON()
 
-      // On retire 'endpoint' car la base de données le génère automatiquement
+      // Correction : on utilise 'endpoint' pour le onConflict car c'est la clé unique gérée par la BDD
       const { error } = await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
         subscription: subJson,
-      }, { onConflict: 'user_id' })
+      }, { onConflict: 'endpoint' })
 
       if (error) throw error
 
