@@ -43,11 +43,13 @@ export default function PushNotificationTester() {
 
       const subJson = subscription.toJSON()
 
-      // Correction : on utilise 'endpoint' pour le onConflict car c'est la clé unique gérée par la BDD
+      // Une ligne par appareil : `device_endpoint` (colonne écrite par le code).
+      // `endpoint` est générée par la base, donc en lecture seule.
       const { error } = await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
+        device_endpoint: subscription.endpoint,
         subscription: subJson,
-      }, { onConflict: 'endpoint' })
+      }, { onConflict: 'device_endpoint' })
 
       if (error) throw error
 

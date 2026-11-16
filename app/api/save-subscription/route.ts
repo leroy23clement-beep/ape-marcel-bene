@@ -28,9 +28,10 @@ function parseSubscription(value: Record<string, unknown>): CleanSubscription | 
  * Correction : le corps de la requête (JSON du navigateur, sans `user_id`)
  * était inséré tel quel ; on écrit maintenant un objet maîtrisé.
  *
- * On reste sur `onConflict: 'user_id'` : `endpoint` est une colonne
- * **générée** dans Supabase (`subscription->>'endpoint'`), donc non inscriptible.
- * Conséquence assumée : une personne = un appareil notifié (le dernier activé).
+ * Une ligne par appareil : la clé d'unicité est `device_endpoint`, une colonne
+ * texte ordinaire ajoutée par la migration `…_device_endpoint.sql`.
+ * On n'utilise PAS `endpoint` : dans cette base c'est une colonne générée
+ * (`subscription->>'endpoint'`), donc non inscriptible — l'upsert échouait.
  */
 export async function POST(request: Request) {
   try {
@@ -52,9 +53,10 @@ export async function POST(request: Request) {
     const { error } = await supabase.from('push_subscriptions').upsert(
       {
         user_id: user.id,
+        device_endpoint: subscription.endpoint,
         subscription,
       },
-      { onConflict: 'user_id' }
+      { onConflict: 'device_endpoint' }
     )
 
     if (error) throw error

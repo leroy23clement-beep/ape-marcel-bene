@@ -36,12 +36,18 @@ export default function BureauPage() {
 
         const subJson = subscription.toJSON()
 
-        // Insertion dans Supabase avec la structure correcte (endpoint + objet subscription jsonb)
-        await supabase.from('push_subscriptions').upsert({
+        // Une ligne par appareil : clé `device_endpoint` (voir la migration
+        // …_push_subscriptions_device_endpoint.sql). On n'écrit pas `endpoint`,
+        // qui est une colonne générée donc en lecture seule.
+        const { error: pushError } = await supabase.from('push_subscriptions').upsert({
           user_id: currentUser.id,
-          endpoint: subscription.endpoint,
+          device_endpoint: subscription.endpoint,
           subscription: subJson,
-        }, { onConflict: 'endpoint' })
+        }, { onConflict: 'device_endpoint' })
+
+        if (pushError) {
+          console.error("Erreur d'enregistrement push automatique :", pushError)
+        }
 
       } catch (err) {
         console.error("Erreur d'enregistrement push automatique :", err)
