@@ -200,13 +200,17 @@ export function AuthForms({
   );
 }
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: { [key: string]: string | string[] | undefined };
+  // Next 16 : `searchParams` est une Promise. Le typer en objet synchrone
+  // faisait que `searchParams.next` et `searchParams.error` valaient toujours
+  // undefined (message d'erreur de callback et `?next=` perdus).
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const next = typeof searchParams?.next === "string" ? searchParams.next : undefined;
-  const hasCallbackError = searchParams?.error === "callback_error";
+  const params = (await searchParams) ?? {};
+  const next = typeof params.next === "string" ? params.next : undefined;
+  const hasCallbackError = params.error === "callback_error";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">

@@ -1,23 +1,57 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import Navbar from "@/components/Navbar";
-import { updateUserRole } from "@/lib/actions/admin";
-import { updateAssociationStats } from "@/lib/actions/admin"; // <--- Import de l'action
+import { updateUserRole, updateAssociationStats } from "@/lib/actions/admin";
+import { ALL_ROLES } from "@/types/roles";
+import AdminFormFeedback from "@/components/AdminFormFeedback";
 import ExportCSVButton from "@/components/ExportCSVButton";
 
-const ROLES = [
-  { value: "parent", label: "Parent d'élève" },
-  { value: "membre_codir", label: "Membre du CODIR" },
-  { value: "president", label: "Président(e)" },
-  { value: "vice_president", label: "Vice-Président(e)" },
-  { value: "secretaire", label: "Secrétaire" },
-  { value: "vice_secretaire", label: "Vice-Secrétaire" },
-  { value: "tresorier", label: "Trésorier(e)" },
-  { value: "vice_tresorier", label: "Vice-Trésorier(e)" },
-  { value: "admin", label: "Administrateur" },
-];
+// Libellés des rôles : la liste des valeurs vient de `types/roles.ts`, source
+// unique. Avant, cet écran proposait des rôles que les autres pages ne
+// reconnaissaient pas (ex. « vice_president » n'ouvrait aucun accès).
+const ROLE_LABELS: Record<string, string> = {
+  parent: "Parent d'élève",
+  membre_codir: "Membre du CODIR",
+  bureau: "Membre du bureau",
+  president: "Président(e)",
+  vice_president: "Vice-Président(e)",
+  secretaire: "Secrétaire",
+  vice_secretaire: "Vice-Secrétaire",
+  tresorier: "Trésorier(e)",
+  vice_tresorier: "Vice-Trésorier(e)",
+  admin: "Administrateur",
+}
 
-export default async function AdminPage() {
+const ROLES = ALL_ROLES.filter((role) => role !== "parent").map((role) => ({
+  value: role,
+  label: ROLE_LABELS[role] ?? role,
+}))
+
+/** Enveloppe l'action pour rediriger avec le résultat (affiché par AdminFormFeedback). */
+async function updateAssociationStatsAction(formData: FormData) {
+  "use server"
+  const result = await updateAssociationStats(formData)
+  revalidatePath("/admin")
+  redirect(result.ok ? "/admin?ok=1" : `/admin?error=${encodeURIComponent(result.error ?? "Erreur")}`)
+}
+
+async function updateUserRoleAction(formData: FormData) {
+  "use server"
+  const result = await updateUserRole(formData)
+  revalidatePath("/admin")
+  redirect(result.ok ? "/admin?ok=1" : `/admin?error=${encodeURIComponent(result.error ?? "Erreur")}`)
+}
+
+export default async function AdminPage({
+  searchParams,
+}: {
+  // Next 16 : `searchParams` est une Promise. On s'en sert pour réafficher le
+  // résultat des formulaires (`?ok=1` / `?error=...`).
+  searchParams?: Promise<{ ok?: string; error?: string }>;
+}) {
+  const params = (await searchParams) ?? {}
+  const formState = { ok: params.ok === "1", error: params.error }
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -51,9 +85,10 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
 
       <main className="mx-auto max-w-4xl p-6 space-y-6">
+        <AdminFormFeedback state={formState} />
         <header className="flex justify-between items-center border-b pb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Administration & Bureau CODIR</h1>
@@ -74,7 +109,7 @@ export default async function AdminPage() {
             </p>
           </div>
 
-          <form action={updateAssociationStats} className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <form action={updateAssociationStatsAction} className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Bénéfices Manifestations (€)
@@ -133,7 +168,7 @@ export default async function AdminPage() {
                     <p className="text-xs text-gray-500">{member.id}</p>
                   </div>
 
-                  <form action={updateUserRole} className="flex items-center gap-2">
+                  <form action={updateUserRoleAction} className="flex items-center gap-2">
                     <input type="hidden" name="userId" value={member.id} />
                     <select
                       name="role"

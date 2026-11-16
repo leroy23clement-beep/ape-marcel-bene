@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import { BUREAU_ROLES, hasRole } from '@/types/roles'
 
 export default function TasksPage() {
   const supabase = createClient()
@@ -28,7 +29,9 @@ export default function TasksPage() {
       setProfile(profileData)
 
       // Vérification rapide des droits bureau
-      if (profileData?.role === 'parent') {
+      // Avant : seul `role === 'parent'` était refusé, donc un rôle vide ou
+      // inconnu passait. Liste explicite désormais.
+      if (!hasRole(profileData?.role, BUREAU_ROLES)) {
         window.location.href = '/dashboard'
         return
       }
@@ -87,7 +90,7 @@ export default function TasksPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
 
       <main className="mx-auto max-w-5xl p-6 space-y-8">
         <header className="border-b pb-4 flex justify-between items-center">

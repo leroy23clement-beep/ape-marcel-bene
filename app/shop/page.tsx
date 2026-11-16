@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import ProductTasksManager from '@/components/ProductTasksManager'
+import { createOrder } from '@/lib/actions/shop'
+import { BUREAU_ROLES, hasRole } from '@/types/roles'
 
 export default function ShopPage() {
   const supabase = createClient()
@@ -172,39 +174,37 @@ export default function ShopPage() {
 
   const handleOrder = async (productId: string, quantity: number) => {
     try {
-      const product = products.find(p => p.id === productId)
-      if (product?.is_closed) {
-        alert("Cette vente est clôturée, il n'est plus possible de commander.")
+      // Prix, état de la vente et utilisateur vérifiés côté serveur : avant,
+      // tout était calculé dans le navigateur (prix falsifiable) et `user.id`
+      // plantait si la session avait expiré.
+      const formData = new FormData()
+      formData.set('productId', productId)
+      formData.set('quantity', String(quantity))
+
+      const result = await createOrder(formData)
+      if (!result.ok) {
+        alert(result.error ?? 'Erreur lors de la commande.')
         return
       }
 
-      const totalPrice = (product?.price || 0) * quantity
-
-      const { error } = await supabase.from('orders').insert({
-        user_id: user.id,
-        product_id: productId,
-        quantity,
-        total_price: totalPrice,
-        status: 'pending'
-      })
-
-      if (error) throw error
-
       alert("Commande enregistrée avec succès !")
-      fetchShopData(user.id)
-    } catch (error: any) {
+      if (user) fetchShopData(user.id)
+    } catch (error: unknown) {
       console.error("Erreur commande :", error)
-      alert("Erreur lors de la commande : " + error.message)
+      const message = error instanceof Error ? error.message : 'Erreur inconnue'
+      alert("Erreur lors de la commande : " + message)
     }
   }
 
-  const isBureau = profile?.role && profile.role !== "parent"
+  // Avant : `role !== "parent"`, donc un rôle vide ou inconnu ouvrait les
+  // outils du bureau. La liste vient maintenant de `types/roles.ts`.
+  const isBureau = hasRole(profile?.role, BUREAU_ROLES)
 
   if (!user) return null
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
 
       <main className="mx-auto max-w-4xl p-6 space-y-8">
         <header className="border-b pb-4">

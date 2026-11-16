@@ -49,7 +49,9 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
     if (role === 'admin') return 'Patron'
     if (role === 'tresorier') return 'Picsou'
     if (role === 'secretaire') return 'Biquette'
-    return firstName || userEmail
+    // `user.email` peut être `null` côté Supabase : on retombe sur une chaîne vide
+    // pour ne pas afficher « null » dans la barre de navigation.
+    return firstName || userEmail || ''
   }
 
   const displayName = getDisplayName()

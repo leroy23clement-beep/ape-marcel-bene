@@ -1,112 +1,73 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requireAdmin } from './_guards'
+import { ALL_ROLES, type Role } from '@/types/roles'
 
-// Rôles autorisés à gérer l'association (rôles et indicateurs financiers)
-const MANAGER_ROLES: readonly string[] = ['president', 'admin']
-
-// Doit rester identique à la liste de la fonction SQL public.set_user_role
-const ASSIGNABLE_ROLES: readonly string[] = [
-  'parent',
-  'bureau',
-  'membre_codir',
-  'president',
-  'vice_president',
-  'secretaire',
-  'vice_secretaire',
-  'tresorier',
-  'vice_tresorier',
-  'admin',
-]
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+export type AdminFormState = { ok: boolean; error?: string }
 
 /**
- * Vérifie la session puis le rôle de l'appelant.
- * Lance une erreur si l'utilisateur n'est pas connecté ou n'a pas le droit.
+ * Change le rôle d'un membre.
+ *
+ * Avant : aucune validation de `role` (n'importe quelle chaîne était écrite en
+ * base, y compris une valeur qui ne correspond à aucun rôle) et un admin
+ * pouvait retirer son propre rôle d'admin, se verrouillant dehors.
  */
-async function requireRole(allowed: readonly string[]) {
-  const supabase = await createClient()
+export async function updateUserRole(formData: FormData): Promise<AdminFormState> {
+  const { supabase, user } = await requireAdmin()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Non autorisé')
+  const targetUserId = String(formData.get('userId') ?? '')
+  const rawRole = String(formData.get('role') ?? '').trim().toLowerCase()
 
-  const { data: profile } = await supabase
+  if (!targetUserId) {
+    return { ok: false, error: 'Utilisateur cible manquant.' }
+  }
+
+  if (!(ALL_ROLES as readonly string[]).includes(rawRole)) {
+    return { ok: false, error: `Rôle invalide : « ${rawRole} ».` }
+  }
+  const newRole = rawRole as Role
+
+  // Se retirer soi-même ses droits d'administration coupe l'accès à /admin.
+  if (targetUserId === user.id && newRole !== 'admin') {
+    return {
+      ok: false,
+      error: 'Tu ne peux pas retirer ton propre rôle d’administrateur.',
+    }
+  }
+
+  const { error } = await supabase
     .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !allowed.includes(profile.role)) {
-    throw new Error('Droit refusé : réservé à la Présidence ou Administration')
-  }
-
-  return { supabase, user, role: profile.role as string }
-}
-
-/** Convertit un champ de formulaire en montant valide (accepte "12,50"). */
-function parseAmount(value: FormDataEntryValue | null, label: string): number {
-  const raw =
-    typeof value === 'string' ? value.trim().replace(/\s/g, '').replace(',', '.') : ''
-
-  if (raw === '') throw new Error(`${label} : valeur manquante`)
-
-  const amount = Number(raw)
-  if (!Number.isFinite(amount) || amount < 0 || amount > 10_000_000) {
-    throw new Error(`${label} : montant invalide`)
-  }
-
-  return Math.round(amount * 100) / 100
-}
-
-export async function updateUserRole(formData: FormData) {
-  const { supabase, user, role: callerRole } = await requireRole(MANAGER_ROLES)
-
-  const targetUserId = formData.get('userId')
-  const newRole = formData.get('role')
-
-  if (typeof targetUserId !== 'string' || !UUID_RE.test(targetUserId)) {
-    throw new Error('Utilisateur invalide')
-  }
-  if (typeof newRole !== 'string' || !ASSIGNABLE_ROLES.includes(newRole)) {
-    throw new Error('Rôle invalide')
-  }
-  if (targetUserId === user.id) {
-    throw new Error('Tu ne peux pas modifier ton propre rôle')
-  }
-  if (newRole === 'admin' && callerRole !== 'admin') {
-    throw new Error('Seul un administrateur peut nommer un administrateur')
-  }
-
-  // Le changement passe par une fonction SQL sécurisée (la colonne role
-  // n'est plus modifiable directement depuis le client).
-  const { error } = await supabase.rpc('set_user_role', {
-    target: targetUserId,
-    new_role: newRole,
-  })
+    .update({ role: newRole })
+    .eq('id', targetUserId)
 
   if (error) {
     console.error('Erreur mise à jour rôle :', error)
-    throw new Error('Impossible de modifier le rôle')
+    return { ok: false, error: 'Impossible de mettre à jour le rôle.' }
   }
 
   revalidatePath('/admin')
+  return { ok: true }
 }
 
-export async function updateAssociationStats(formData: FormData) {
-  const { supabase } = await requireRole(MANAGER_ROLES)
+/** Met à jour les indicateurs financiers affichés sur le tableau de bord. */
+export async function updateAssociationStats(formData: FormData): Promise<AdminFormState> {
+  const { supabase } = await requireAdmin()
 
-  const totalProfits = parseAmount(formData.get('totalProfits'), 'Bénéfices totaux')
-  const totalSchoolExpenses = parseAmount(
-    formData.get('totalSchoolExpenses'),
-    'Dépenses pour l\'école'
-  )
+  const parseAmount = (value: FormDataEntryValue | null): number | null => {
+    if (value === null || String(value).trim() === '') return 0
+    const parsed = Number(String(value).replace(',', '.'))
+    if (!Number.isFinite(parsed) || parsed < 0) return null
+    return Math.round(parsed * 100) / 100
+  }
 
-  // Mise à jour de la table association_stats (ligne id = 1)
+  const totalProfits = parseAmount(formData.get('totalProfits'))
+  const totalSchoolExpenses = parseAmount(formData.get('totalSchoolExpenses'))
+
+  if (totalProfits === null || totalSchoolExpenses === null) {
+    return { ok: false, error: 'Les montants doivent être des nombres positifs.' }
+  }
+
   const { error } = await supabase
     .from('association_stats')
     .update({
@@ -117,10 +78,11 @@ export async function updateAssociationStats(formData: FormData) {
     .eq('id', 1)
 
   if (error) {
-    console.error('Erreur mise à jour des stats de l\'association :', error)
-    throw new Error('Erreur lors de la mise à jour des indicateurs financiers')
+    console.error('Erreur mise à jour des stats de l’association :', error)
+    return { ok: false, error: 'Erreur lors de la mise à jour des indicateurs financiers.' }
   }
 
   revalidatePath('/admin')
   revalidatePath('/dashboard')
+  return { ok: true }
 }

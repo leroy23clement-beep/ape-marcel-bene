@@ -1,52 +1,86 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { AuthorizationError, requireBureau, requireUser } from './_guards'
 
+/**
+ * Création d'un événement.
+ *
+ * Avant : `visibility` et `event_date` venaient du formulaire sans contrôle
+ * (une date vide ou invalide partait en base) et aucune vérification de rôle
+ * n'était faite autrement que par la RLS.
+ */
 export async function createEvent(formData: FormData) {
+  let guarded
   try {
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Non autorisé')
-
-    const title = formData.get('title') as string
-    const description = formData.get('description') as string
-    const event_date = formData.get('event_date') as string
-    const location = formData.get('location') as string
-    const visibility = formData.get('visibility') as string || 'public'
-    const image_url = formData.get('image_url') as string || null
-
-    const { error } = await supabase.from('events').insert({
-      title,
-      description,
-      event_date,
-      location,
-      visibility,
-      is_internal: visibility !== 'public',
-      image_url,
-    })
-
-    if (error) {
-      console.error('Erreur insertion base de données :', error.message)
-      throw new Error(`Erreur base de données : ${error.message}`)
-    }
-
-    revalidatePath('/events')
-  } catch (err: any) {
-    console.error('Erreur globale createEvent :', err.message)
+    guarded = await requireBureau()
+  } catch (err) {
+    if (err instanceof AuthorizationError) return { ok: false, error: err.message }
     throw err
   }
+  const { supabase } = guarded
+
+  const title = String(formData.get('title') ?? '').trim()
+  if (!title) return { ok: false, error: 'Le titre est obligatoire.' }
+
+  const rawDate = String(formData.get('event_date') ?? '')
+  const eventDate = new Date(rawDate)
+  if (!rawDate || Number.isNaN(eventDate.getTime())) {
+    return { ok: false, error: 'Date de l’événement invalide.' }
+  }
+
+  const description = String(formData.get('description') ?? '')
+  const location = String(formData.get('location') ?? '').trim()
+  const visibility = String(formData.get('visibility') ?? 'public') === 'private' ? 'private' : 'public'
+  const image_url = String(formData.get('image_url') ?? '').trim() || null
+
+  const { error } = await supabase.from('events').insert({
+    title,
+    description,
+    event_date: eventDate.toISOString(),
+    location: location || null,
+    visibility,
+    is_internal: visibility !== 'public',
+    image_url,
+  })
+
+  if (error) {
+    console.error('Erreur insertion base de données :', error.message)
+    return { ok: false, error: `Erreur base de données : ${error.message}` }
+  }
+
+  revalidatePath('/events')
+  revalidatePath('/dashboard')
+  return { ok: true }
 }
 
+/**
+ * Inscription d'un bénévole à un créneau.
+ *
+ * Avant : un double clic créait deux inscriptions (aucune contrainte gérée
+ * côté action) et une erreur d'insertion était avalée (`return` sans message),
+ * le formulaire semblait avoir fonctionné.
+ */
 export async function registerVolunteer(formData: FormData) {
-  const supabase = await createClient()
+  const { supabase, user } = await requireUser()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Non autorisé')
+  const eventId = String(formData.get('eventId') ?? '')
+  const roleNeeded = String(formData.get('roleNeeded') ?? '').trim()
 
-  const eventId = formData.get('eventId') as string
-  const roleNeeded = formData.get('roleNeeded') as string
+  if (!eventId) return { ok: false, error: 'Événement manquant.' }
+  if (!roleNeeded) return { ok: false, error: 'Créneau manquant.' }
+
+  const { data: existing } = await supabase
+    .from('event_volunteers')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('user_id', user.id)
+    .eq('role', roleNeeded)
+    .maybeSingle()
+
+  if (existing) {
+    return { ok: false, error: 'Tu es déjà inscrit à ce créneau.' }
+  }
 
   const { error } = await supabase.from('event_volunteers').insert({
     event_id: eventId,
@@ -56,8 +90,9 @@ export async function registerVolunteer(formData: FormData) {
 
   if (error) {
     console.error('Erreur inscription bénévole :', error)
-    return
+    return { ok: false, error: 'Impossible de t’inscrire à ce créneau.' }
   }
 
   revalidatePath('/events')
+  return { ok: true }
 }

@@ -1,0 +1,3264 @@
+diff --git a/app/admin/events/new/page.tsx b/app/admin/events/new/page.tsx
+--- a/app/admin/events/new/page.tsx
++++ b/app/admin/events/new/page.tsx
+@@ -6,24 +6,36 @@ import { useRouter, useSearchParams } from 'next/navigation'
+ import Navbar from '@/components/Navbar'
+ import Link from 'next/link'
+ 
++/** Convertit une valeur ISO en valeur locale pour `<input type="datetime-local">`. */
++function toDateTimeLocal(isoValue: string | null): string {
++  if (!isoValue) return ''
++  const date = new Date(isoValue)
++  if (Number.isNaN(date.getTime())) return ''
++  const pad = (n: number) => String(n).padStart(2, '0')
++  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
++}
++
++const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
++const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 Mo
++
+ function EventFormContent() {
+   const supabase = createClient()
+   const router = useRouter()
+   const searchParams = useSearchParams()
+-  const eventId = searchParams.get('id') // Récupération de l'ID s'il est présent dans l'URL
++  const eventId = searchParams.get('id')
+ 
+-  const [user, setUser] = useState<any>(null)
+-  const [profile, setProfile] = useState<any>(null)
++  const [user, setUser] = useState<{ email?: string } | null>(null)
++  const [profile, setProfile] = useState<{ first_name?: string; role?: string } | null>(null)
+   const [loading, setLoading] = useState(false)
+   const [uploading, setUploading] = useState(false)
+ 
+-  // Champs du formulaire
+   const [title, setTitle] = useState('')
+   const [description, setDescription] = useState('')
+   const [eventDate, setEventDate] = useState('')
+   const [location, setLocation] = useState('')
+   const [imageUrl, setImageUrl] = useState('')
+ 
++  // Contrôle d'accès : réservé aux administrateurs.
+   useEffect(() => {
+     async function checkUserAndAdmin() {
+       const { data: { user } } = await supabase.auth.getUser()
+@@ -46,9 +58,10 @@ function EventFormContent() {
+       }
+     }
+     checkUserAndAdmin()
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [router])
+ 
+-  // Si un ID est présent dans l'URL, on charge les données de l'événement pour les pré-remplir
++  // Si un ID est présent dans l'URL, on charge l'événement pour le pré-remplir.
+   useEffect(() => {
+     if (!eventId) return
+ 
+@@ -60,49 +73,56 @@ function EventFormContent() {
+         .single()
+ 
+       if (data) {
+-        setTitle(data.title || '')
+-        setDescription(data.description || '')
+-        // Formatage de la date pour le champ 'datetime-local' (YYYY-MM-DDThh:mm)
+-        if (data.event_date) {
+-          setEventDate(data.event_date.slice(0, 16))
+-        }
+-        setLocation(data.location || '')
+-        setImageUrl(data.image_url || '')
++        setTitle(data.title ?? '')
++        setDescription(data.description ?? '')
++        // `slice(0, 16)` supposait une valeur ISO en UTC : le champ
++        // `datetime-local` affichait une heure décalée de 2 h l'été.
++        setEventDate(toDateTimeLocal(data.event_date))
++        setLocation(data.location ?? '')
++        setImageUrl(data.image_url ?? '')
+       } else if (error) {
+         alert("Erreur lors du chargement de l'événement : " + error.message)
+       }
+     }
+     fetchEventToEdit()
++    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [eventId])
+ 
+-  // Fonction pour gérer l'upload du fichier image vers le bucket 'events-images'
++  // Upload de l'affiche vers le bucket 'events-images'.
+   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+     try {
+       setUploading(true)
+       const file = e.target.files?.[0]
+       if (!file) return
+ 
+-      const fileExt = file.name.split('.').pop()
+-      const fileName = `${Date.now()}.${fileExt}`
+-      const filePath = `${fileName}`
++      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
++        alert('Image refusée : formats acceptés JPG, PNG, WEBP ou GIF.')
++        e.target.value = ''
++        return
++      }
++      if (file.size > MAX_IMAGE_BYTES) {
++        alert('Image trop lourde (5 Mo maximum).')
++        e.target.value = ''
++        return
++      }
++
++      const fileExt = (file.name.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
++      const filePath = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+ 
+-      // Upload dans le bucket Supabase 'events-images'
+       const { error: uploadError } = await supabase.storage
+         .from('events-images')
+-        .upload(filePath, file)
++        .upload(filePath, file, { contentType: file.type })
+ 
+-      if (uploadError) {
+-        throw uploadError
+-      }
++      if (uploadError) throw uploadError
+ 
+-      // Récupération de l'URL publique de l'image
+       const { data } = supabase.storage
+         .from('events-images')
+         .getPublicUrl(filePath)
+ 
+       setImageUrl(data.publicUrl)
+-    } catch (error: any) {
+-      alert("Erreur lors de l'upload de l'image : " + error.message)
++    } catch (error: unknown) {
++      const message = error instanceof Error ? error.message : 'Erreur inconnue'
++      alert("Erreur lors de l'upload de l'image : " + message)
+     } finally {
+       setUploading(false)
+     }
+@@ -112,156 +132,133 @@ function EventFormContent() {
+     e.preventDefault()
+     setLoading(true)
+ 
+-    let error
++    try {
++      if (!title.trim() || !eventDate) {
++        alert('Le titre et la date sont obligatoires.')
++        return
++      }
+ 
+-    if (eventId) {
+-      // Mode Modification (UPDATE)
+-      const res = await supabase
+-        .from('events')
+-        .update({
+-          title,
+-          description,
+-          event_date: eventDate,
+-          location: location || null,
+-          image_url: imageUrl || null,
+-        })
+-        .eq('id', eventId)
+-      error = res.error
+-    } else {
+-      // Mode Création (INSERT)
+-      const res = await supabase.from('events').insert([
+-        {
+-          title,
+-          description,
+-          event_date: eventDate,
+-          location: location || null,
+-          image_url: imageUrl || null,
+-        },
+-      ])
+-      error = res.error
+-    }
++      const payload = {
++        title: title.trim(),
++        description,
++        event_date: eventDate,
++        location: location || null,
++        image_url: imageUrl || null,
++      }
+ 
+-    setLoading(false)
++      if (eventId) {
++        const { error } = await supabase
++          .from('events')
++          .update(payload)
++          .eq('id', eventId)
++        if (error) throw error
++      } else {
++        const { error } = await supabase.from('events').insert([payload])
++        if (error) throw error
++      }
+ 
+-    if (error) {
+-      alert("Erreur lors de l'enregistrement de l'événement : " + error.message)
+-    } else {
+       router.push('/events')
++      router.refresh()
++    } catch (error: unknown) {
++      const message = error instanceof Error ? error.message : 'Erreur inconnue'
++      alert("Erreur lors de l'enregistrement : " + message)
++    } finally {
++      setLoading(false)
+     }
+   }
+ 
+   return (
+     <div className="min-h-screen bg-gray-50">
+-      {user && (
+-        <Navbar 
+-          userEmail={user.email} 
+-          firstName={profile?.first_name} 
+-          role={profile?.role} 
+-        />
+-      )}
+-
+-      <main className="mx-auto max-w-2xl p-6 space-y-6">
+-        <div>
+-          <Link href="/events" className="text-xs font-semibold text-purple-700 hover:underline">
+-            « Retour aux événements
++      <Navbar userEmail={user?.email ?? ''} firstName={profile?.first_name} role={profile?.role} />
++
++      <main className="mx-auto max-w-3xl p-6 space-y-6">
++        <div className="flex justify-between items-center border-b pb-4">
++          <h1 className="text-2xl font-bold text-gray-900">
++            {eventId ? 'Modifier un événement' : 'Créer un événement'}
++          </h1>
++          <Link href="/events" className="text-xs text-purple-700 hover:underline">
++            ← Retour aux événements
+           </Link>
+         </div>
+ 
+-        <div className="bg-white border rounded-2xl p-8 shadow-sm space-y-6">
+-          <h1 className="text-2xl font-extrabold text-gray-950">
+-            {eventId ? "Modifier l'événement" : "Ajouter un nouvel événement"}
+-          </h1>
++        <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 shadow-sm space-y-4">
++          <div>
++            <label className="block text-xs font-medium text-gray-700 mb-1">Titre *</label>
++            <input
++              type="text"
++              value={title}
++              onChange={(e) => setTitle(e.target.value)}
++              required
++              className="w-full p-2 border rounded-lg text-sm text-gray-900"
++            />
++          </div>
+ 
+-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+-            <div>
+-              <label className="block font-medium text-gray-700 mb-1">Titre de l'événement *</label>
+-              <input 
+-                type="text" 
+-                value={title} 
+-                onChange={(e) => setTitle(e.target.value)} 
+-                required
+-                placeholder="Ex: Boum de fin d'année"
+-                className="w-full p-2.5 border rounded-lg text-gray-900 text-sm"
+-              />
+-            </div>
+-
+-            <div>
+-              <label className="block font-medium text-gray-700 mb-1">Date et heure *</label>
+-              <input 
+-                type="datetime-local" 
+-                value={eventDate} 
+-                onChange={(e) => setEventDate(e.target.value)} 
+-                required
+-                className="w-full p-2.5 border rounded-lg text-gray-900 text-sm"
+-              />
+-            </div>
+-
+-            <div>
+-              <label className="block font-medium text-gray-700 mb-1">Lieu</label>
+-              <input 
+-                type="text" 
+-                value={location} 
+-                onChange={(e) => setLocation(e.target.value)} 
+-                placeholder="Ex: École Marcel Béné, Muizon"
+-                className="w-full p-2.5 border rounded-lg text-gray-900 text-sm"
+-              />
+-            </div>
+-
+-            {/* Sélecteur de fichier pointant vers events-images */}
+-            <div>
+-              <label className="block font-medium text-gray-700 mb-1">Affiche de l'événement (Image)</label>
+-              <input 
+-                type="file" 
+-                accept="image/*"
+-                onChange={handleImageUpload}
+-                className="w-full p-2 border rounded-lg text-gray-700 text-xs bg-gray-50 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
+-              />
+-              {uploading && <p className="text-[11px] text-purple-600 mt-1">Téléchargement de l'image en cours...</p>}
+-              {imageUrl && !uploading && (
+-                <div className="mt-2 flex items-center gap-3">
+-                  <span className="text-green-600 font-medium text-[11px]">✓ Image chargée avec succès</span>
+-                  <img src={imageUrl} alt="Aperçu" className="h-16 w-auto rounded border object-contain" />
+-                </div>
+-              )}
+-            </div>
+-
+-            <div>
+-              <label className="block font-medium text-gray-700 mb-1">Description</label>
+-              <textarea 
+-                value={description} 
+-                onChange={(e) => setDescription(e.target.value)} 
+-                rows={5}
+-                placeholder="Détails complets de l'événement..."
+-                className="w-full p-2.5 border rounded-lg text-gray-900 text-sm resize-none"
+-              />
+-            </div>
+-
+-            <div className="flex justify-end gap-3 pt-4 border-t">
+-              <Link
+-                href="/events"
+-                className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 font-semibold"
+-              >
+-                Annuler
+-              </Link>
+-              <button
+-                type="submit"
+-                disabled={loading || uploading}
+-                className="px-5 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition font-semibold cursor-pointer disabled:opacity-50"
+-              >
+-                {loading ? 'Enregistrement en cours...' : (eventId ? 'Mettre à jour' : 'Publier l\'événement')}
+-              </button>
+-            </div>
+-          </form>
+-        </div>
++          <div>
++            <label className="block text-xs font-medium text-gray-700 mb-1">Date et heure *</label>
++            <input
++              type="datetime-local"
++              value={eventDate}
++              onChange={(e) => setEventDate(e.target.value)}
++              required
++              className="w-full p-2 border rounded-lg text-sm text-gray-900"
++            />
++          </div>
++
++          <div>
++            <label className="block text-xs font-medium text-gray-700 mb-1">Lieu</label>
++            <input
++              type="text"
++              value={location}
++              onChange={(e) => setLocation(e.target.value)}
++              className="w-full p-2 border rounded-lg text-sm text-gray-900"
++            />
++          </div>
++
++          <div>
++            <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
++            <textarea
++              value={description}
++              onChange={(e) => setDescription(e.target.value)}
++              rows={4}
++              className="w-full p-2 border rounded-lg text-sm text-gray-900"
++            />
++          </div>
++
++          <div>
++            <label className="block text-xs font-medium text-gray-700 mb-1">Affiche</label>
++            <input
++              type="file"
++              accept="image/jpeg,image/png,image/webp,image/gif"
++              onChange={handleImageUpload}
++              className="w-full p-2 border rounded-lg text-sm text-gray-900 bg-white"
++            />
++            {uploading && <p className="text-xs text-gray-500 mt-1">Envoi de l’image…</p>}
++            {imageUrl && (
++              <p className="text-xs text-emerald-700 mt-1 break-all">Image enregistrée : {imageUrl}</p>
++            )}
++          </div>
++
++          <button
++            type="submit"
++            disabled={loading || uploading}
++            className="w-full bg-purple-700 hover:bg-purple-800 disabled:bg-gray-400 text-white text-sm font-medium py-2 rounded-lg transition cursor-pointer"
++          >
++            {loading ? 'Enregistrement…' : eventId ? 'Enregistrer les modifications' : 'Créer l’événement'}
++          </button>
++        </form>
+       </main>
+     </div>
+   )
+ }
+ 
++/**
++ * `useSearchParams()` doit être sous un `<Suspense>` en Next 16, sinon la page
++ * est rendue entièrement côté client sans avertissement.
++ */
+ export default function NewEventPage() {
+   return (
+     <Suspense fallback={<div className="p-8 text-center text-xs text-gray-500">Chargement...</div>}>
+       <EventFormContent />
+     </Suspense>
+   )
+-}
+\ No newline at end of file
++}
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -1,23 +1,57 @@
+ import { createClient } from "@/lib/supabase/server";
+ import { redirect } from "next/navigation";
++import { revalidatePath } from "next/cache";
+ import Navbar from "@/components/Navbar";
+-import { updateUserRole } from "@/lib/actions/admin";
+-import { updateAssociationStats } from "@/lib/actions/admin"; // <--- Import de l'action
++import { updateUserRole, updateAssociationStats } from "@/lib/actions/admin";
++import { ALL_ROLES } from "@/types/roles";
++import AdminFormFeedback from "@/components/AdminFormFeedback";
+ import ExportCSVButton from "@/components/ExportCSVButton";
+ 
+-const ROLES = [
+-  { value: "parent", label: "Parent d'élève" },
+-  { value: "membre_codir", label: "Membre du CODIR" },
+-  { value: "president", label: "Président(e)" },
+-  { value: "vice_president", label: "Vice-Président(e)" },
+-  { value: "secretaire", label: "Secrétaire" },
+-  { value: "vice_secretaire", label: "Vice-Secrétaire" },
+-  { value: "tresorier", label: "Trésorier(e)" },
+-  { value: "vice_tresorier", label: "Vice-Trésorier(e)" },
+-  { value: "admin", label: "Administrateur" },
+-];
+-
+-export default async function AdminPage() {
++// Libellés des rôles : la liste des valeurs vient de `types/roles.ts`, source
++// unique. Avant, cet écran proposait des rôles que les autres pages ne
++// reconnaissaient pas (ex. « vice_president » n'ouvrait aucun accès).
++const ROLE_LABELS: Record<string, string> = {
++  parent: "Parent d'élève",
++  membre_codir: "Membre du CODIR",
++  bureau: "Membre du bureau",
++  president: "Président(e)",
++  vice_president: "Vice-Président(e)",
++  secretaire: "Secrétaire",
++  vice_secretaire: "Vice-Secrétaire",
++  tresorier: "Trésorier(e)",
++  vice_tresorier: "Vice-Trésorier(e)",
++  admin: "Administrateur",
++}
++
++const ROLES = ALL_ROLES.filter((role) => role !== "parent").map((role) => ({
++  value: role,
++  label: ROLE_LABELS[role] ?? role,
++}))
++
++/** Enveloppe l'action pour rediriger avec le résultat (affiché par AdminFormFeedback). */
++async function updateAssociationStatsAction(formData: FormData) {
++  "use server"
++  const result = await updateAssociationStats(formData)
++  revalidatePath("/admin")
++  redirect(result.ok ? "/admin?ok=1" : `/admin?error=${encodeURIComponent(result.error ?? "Erreur")}`)
++}
++
++async function updateUserRoleAction(formData: FormData) {
++  "use server"
++  const result = await updateUserRole(formData)
++  revalidatePath("/admin")
++  redirect(result.ok ? "/admin?ok=1" : `/admin?error=${encodeURIComponent(result.error ?? "Erreur")}`)
++}
++
++export default async function AdminPage({
++  searchParams,
++}: {
++  // Next 16 : `searchParams` est une Promise. On s'en sert pour réafficher le
++  // résultat des formulaires (`?ok=1` / `?error=...`).
++  searchParams?: Promise<{ ok?: string; error?: string }>;
++}) {
++  const params = (await searchParams) ?? {}
++  const formState = { ok: params.ok === "1", error: params.error }
+   const supabase = await createClient();
+ 
+   const { data: { user } } = await supabase.auth.getUser();
+@@ -51,9 +85,10 @@ export default async function AdminPage() {
+ 
+   return (
+     <div className="min-h-screen bg-gray-50">
+-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
++      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
+ 
+       <main className="mx-auto max-w-4xl p-6 space-y-6">
++        <AdminFormFeedback state={formState} />
+         <header className="flex justify-between items-center border-b pb-4">
+           <div>
+             <h1 className="text-2xl font-bold text-gray-900">Administration & Bureau CODIR</h1>
+@@ -74,7 +109,7 @@ export default async function AdminPage() {
+             </p>
+           </div>
+ 
+-          <form action={updateAssociationStats} className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
++          <form action={updateAssociationStatsAction} className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+             <div>
+               <label className="block text-xs font-medium text-gray-700 mb-1">
+                 Bénéfices Manifestations (€)
+@@ -133,7 +168,7 @@ export default async function AdminPage() {
+                     <p className="text-xs text-gray-500">{member.id}</p>
+                   </div>
+ 
+-                  <form action={updateUserRole} className="flex items-center gap-2">
++                  <form action={updateUserRoleAction} className="flex items-center gap-2">
+                     <input type="hidden" name="userId" value={member.id} />
+                     <select
+                       name="role"
+diff --git a/app/api/cron/reminders/route.ts b/app/api/cron/reminders/route.ts
+--- a/app/api/cron/reminders/route.ts
++++ b/app/api/cron/reminders/route.ts
+@@ -1,37 +1,42 @@
+-import { timingSafeEqual } from 'crypto'
++import { timingSafeEqual } from 'node:crypto'
+ import { NextResponse } from 'next/server'
+ import { createAdminClient } from '@/lib/supabase/admin'
+-import {
+-  CODIR_ROLES,
+-  SECRETARIAT_ROLES,
+-  configureWebPush,
+-  getSubscriptions,
+-  sendToSubscriptions,
+-} from '@/lib/push'
++import { configureWebPush, getSubscriptions, sendToSubscriptions } from '@/lib/push'
+ 
+-function isAuthorized(request: Request): boolean {
+-  const secret = process.env.CRON_SECRET
+-  // Sans secret configuré, on refuse tout (évite que "Bearer undefined" passe)
+-  if (!secret) return false
++/**
++ * Cron quotidien J-7 / J-1 (voir `vercel.json`).
++ *
++ * Corrections apportées :
++ *  1. Le client Supabase venait de `lib/supabase/client.ts` (client navigateur) :
++ *     il n'y a pas de `cookies()` dans une requête de cron, donc la route
++ *     échouait à chaque exécution. Elle utilise maintenant la clé service_role.
++ *  2. La colonne s'appelle `event_date`, pas `date` : ni la requête `.or(...)`
++ *     ni `event.date` ne pouvaient fonctionner.
++ *  3. `CRON_SECRET` absent rendait la route publique (`Bearer undefined`).
++ *  4. Les dates étaient comparées en UTC (`toISOString`) : un événement du
++ *     lundi soir à Paris était considéré comme le mardi.
++ *  5. `sendToSubscriptions` renvoie un objet : le compter directement dans
++ *     `notificationsSent` affichait `[object Object]`.
++ */
+ 
+-  const received = Buffer.from(request.headers.get('authorization') ?? '')
+-  const expected = Buffer.from(`Bearer ${secret}`)
+-  return received.length === expected.length && timingSafeEqual(received, expected)
+-}
++const PARIS_TZ = 'Europe/Paris'
+ 
+-/** Date AAAA-MM-JJ à Paris, avec un décalage en jours. */
++/** Date `AAAA-MM-JJ` du jour à Paris, décalée de `offsetDays`. */
+ function parisDate(offsetDays: number): string {
+-  const d = new Date()
+-  d.setUTCDate(d.getUTCDate() + offsetDays)
+-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(d)
++  const target = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000)
++  // `en-CA` produit directement AAAA-MM-JJ
++  return new Intl.DateTimeFormat('en-CA', { timeZone: PARIS_TZ }).format(target)
+ }
+ 
+-/** Rôles destinataires selon la visibilité de l'événement (undefined = tout le monde, null = personne). */
+-function rolesForVisibility(visibility: string): string[] | undefined | null {
+-  if (visibility === 'public') return undefined
+-  if (visibility === 'codir') return CODIR_ROLES
+-  if (visibility === 'secretariat') return SECRETARIAT_ROLES
+-  return null
++function isAuthorized(request: Request): boolean {
++  const secret = process.env.CRON_SECRET
++  if (!secret) return false // pas de secret configuré : on refuse (avant : ouvert à tous)
++
++  const header = request.headers.get('authorization') ?? ''
++  const expected = `Bearer ${secret}`
++  const a = Buffer.from(header)
++  const b = Buffer.from(expected)
++  return a.length === b.length && timingSafeEqual(a, b)
+ }
+ 
+ export async function GET(request: Request) {
+@@ -41,53 +46,66 @@ export async function GET(request: Request) {
+ 
+   if (!configureWebPush()) {
+     return NextResponse.json(
+-      { error: "Clés VAPID manquantes dans les variables d'environnement Vercel." },
++      { error: "Clés VAPID manquantes dans les variables d'environnement." },
+       { status: 500 }
+     )
+   }
+ 
+-  try {
+-    const admin = createAdminClient()
+-    const dateJ1 = parisDate(1)
+-    const dateJ7 = parisDate(7)
++  const admin = createAdminClient()
+ 
+-    const { data: events, error: eventsError } = await admin
+-      .from('events')
+-      .select('id, title, date, visibility')
+-      .in('date', [dateJ1, dateJ7])
++  const dateJ7 = parisDate(7)
++  const dateJ1 = parisDate(1)
+ 
+-    if (eventsError) throw eventsError
+-    if (!events || events.length === 0) {
+-      return NextResponse.json({ message: "Aucun événement concerné aujourd'hui." })
+-    }
++  // `event_date` est un timestamp : on compare sur la journée parisienne.
++  const dayRange = (day: string) => ({ from: `${day}T00:00:00`, to: `${day}T23:59:59` })
++  const j7 = dayRange(dateJ7)
++  const j1 = dayRange(dateJ1)
++
++  const { data: events, error: eventsError } = await admin
++    .from('events')
++    .select('id, title, event_date')
++    .or(
++      `and(event_date.gte.${j7.from},event_date.lte.${j7.to}),and(event_date.gte.${j1.from},event_date.lte.${j1.to})`
++    )
++    .order('event_date', { ascending: true })
++
++  if (eventsError) {
++    console.error('Cron rappels : lecture des événements impossible', eventsError)
++    return NextResponse.json({ error: 'Lecture des événements impossible.' }, { status: 500 })
++  }
++
++  if (!events || events.length === 0) {
++    return NextResponse.json({ message: "Aucun événement concerné aujourd'hui." })
++  }
+ 
+-    let notificationsSent = 0
++  const subscriptions = await getSubscriptions(admin)
++  if (subscriptions.length === 0) {
++    return NextResponse.json({ message: 'Aucune souscription Push enregistrée.' })
++  }
+ 
+-    for (const event of events) {
+-      const roles = rolesForVisibility(event.visibility ?? 'public')
+-      if (roles === null) continue // visibilité inconnue : on n'envoie rien
++  let notificationsSent = 0
+ 
+-      const subscriptions = await getSubscriptions(admin, roles)
+-      if (subscriptions.length === 0) continue
++  for (const event of events as { id: string; title: string; event_date: string }[]) {
++    const day = new Intl.DateTimeFormat('en-CA', { timeZone: PARIS_TZ }).format(
++      new Date(event.event_date)
++    )
++    const isJ7 = day === dateJ7
+ 
+-      const isJ7 = event.date === dateJ7
+-      const result = await sendToSubscriptions(admin, subscriptions, {
+-        title: isJ7 ? `📅 Dans 7 jours : ${event.title}` : `⏰ Demain : ${event.title}`,
+-        body: isJ7
+-          ? `N'oubliez pas ! L'événement "${event.title}" aura lieu dans une semaine.`
+-          : `Rappel de dernière minute pour "${event.title}". Cliquez pour revoir les détails.`,
+-        url: `/events/${event.id}`,
+-      })
+-      notificationsSent += result.sent
++    const payload = {
++      title: isJ7 ? `📅 Dans 7 jours : ${event.title}` : `⏰ Demain : ${event.title}`,
++      body: isJ7
++        ? `N'oubliez pas ! L'événement "${event.title}" aura lieu dans une semaine.`
++        : `Rappel de dernière minute pour "${event.title}". Cliquez pour revoir les détails.`,
++      url: `/events/${event.id}`,
+     }
+ 
+-    return NextResponse.json({
+-      success: true,
+-      eventsProcessed: events.length,
+-      notificationsSent,
+-    })
+-  } catch (err) {
+-    console.error('Erreur cron rappels :', err)
+-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
++    const result = await sendToSubscriptions(admin, subscriptions, payload)
++    notificationsSent += result.sent
+   }
++
++  return NextResponse.json({
++    success: true,
++    eventsProcessed: events.length,
++    notificationsSent,
++  })
+ }
+diff --git a/app/api/save-subscription/route.ts b/app/api/save-subscription/route.ts
+--- a/app/api/save-subscription/route.ts
++++ b/app/api/save-subscription/route.ts
+@@ -22,6 +22,14 @@ function parseSubscription(value: Record<string, unknown>): CleanSubscription |
+   return { endpoint, keys: { p256dh, auth } }
+ }
+ 
++/**
++ * Enregistre l'abonnement push de l'appareil courant.
++ *
++ * Correction : `onConflict: 'user_id'` écrasait l'abonnement du téléphone quand
++ * la même personne activait les notifications sur son ordinateur, et le corps
++ * de la requête (JSON du navigateur, sans `user_id`) était inséré tel quel.
++ * On s'appuie désormais sur `endpoint` (une ligne par appareil).
++ */
+ export async function POST(request: Request) {
+   try {
+     const supabase = await createClient()
+@@ -29,6 +37,7 @@ export async function POST(request: Request) {
+     const {
+       data: { user },
+     } = await supabase.auth.getUser()
++
+     if (!user) {
+       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+     }
+@@ -38,16 +47,20 @@ export async function POST(request: Request) {
+       return NextResponse.json({ error: 'Abonnement invalide' }, { status: 400 })
+     }
+ 
+-    // Un enregistrement par appareil (user_id + endpoint)
+-    const { error } = await supabase
+-      .from('push_subscriptions')
+-      .upsert({ user_id: user.id, subscription }, { onConflict: 'user_id,endpoint' })
++    const { error } = await supabase.from('push_subscriptions').upsert(
++      {
++        user_id: user.id,
++        endpoint: subscription.endpoint,
++        subscription,
++      },
++      { onConflict: 'endpoint' }
++    )
+ 
+     if (error) throw error
+ 
+     return NextResponse.json({ success: true })
+   } catch (err) {
+-    console.error('Erreur sauvegarde subscription :', err)
++    console.error('Erreur sauvegarde subscription:', err)
+     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+   }
+ }
+diff --git a/app/auth/callback/route.ts b/app/auth/callback/route.ts
+--- a/app/auth/callback/route.ts
++++ b/app/auth/callback/route.ts
+@@ -1,10 +1,22 @@
+ import { createClient } from '@/lib/supabase/server'
+ import { NextResponse } from 'next/server'
+ 
++/**
++ * Seules les destinations internes sont acceptées après connexion.
++ * Avant : `new URL(next, origin)` acceptait `https://exemple.com`, ce qui
++ * permettait une redirection ouverte depuis un lien de confirmation.
++ */
++function safeNext(next: string | null): string {
++  if (!next) return '/dashboard'
++  // Rejette une URL absolue, protocol-relative ou contenant un schéma
++  if (!next.startsWith('/') || next.startsWith('//')) return '/dashboard'
++  return next
++}
++
+ export async function GET(request: Request) {
+   const requestUrl = new URL(request.url)
+   const code = requestUrl.searchParams.get('code')
+-  const next = requestUrl.searchParams.get('next') ?? '/dashboard'
++  const next = safeNext(requestUrl.searchParams.get('next'))
+ 
+   if (code) {
+     const supabase = await createClient()
+@@ -15,6 +27,5 @@ export async function GET(request: Request) {
+     }
+   }
+ 
+-  // En cas d'erreur
+   return NextResponse.redirect(new URL('/login?error=callback_error', requestUrl.origin))
+-}
+\ No newline at end of file
++}
+diff --git a/app/bureau/page.tsx b/app/bureau/page.tsx
+--- a/app/bureau/page.tsx
++++ b/app/bureau/page.tsx
+@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar'
+ import Link from 'next/link'
+ import SendNotificationForm from '@/components/SendNotificationForm'
+ import PushNotificationTester from '@/components/PushNotificationTester'
++import { BUREAU_ROLES, PUSH_SENDER_ROLES, hasRole } from '@/types/roles'
+ 
+ export default function BureauPage() {
+   const supabase = createClient()
+@@ -84,12 +85,11 @@ export default function BureauPage() {
+   if (loading) return null
+   if (!user) return null
+ 
+-  const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
+-  const userRole = profile?.role ? profile.role.toLowerCase() : 'parent'
+-  const isBureau = allowedBureauRoles.includes(userRole)
+-
+-  const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
+-  const canSendNotifications = notificationAllowedRoles.includes(userRole)
++  // Listes centralisées dans `types/roles.ts` : un « vice_trésorier » ou un
++  // « membre_codir » n'ouvrait pas l'espace bureau alors qu'il existe dans
++  // /admin, et un rôle vide était traité comme « parent » sans être refusé.
++  const isBureau = hasRole(profile?.role, BUREAU_ROLES)
++  const canSendNotifications = hasRole(profile?.role, PUSH_SENDER_ROLES)
+ 
+   const bavardsList = whatsappStats?.topBavardsList || []
+   const emojiList = whatsappStats?.topEmojiUsersList || []
+@@ -97,7 +97,7 @@ export default function BureauPage() {
+ 
+   return (
+     <div className="min-h-screen bg-gray-50 pb-12">
+-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
++      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
+ 
+       <main className="mx-auto max-w-4xl p-6 space-y-6">
+         <header className="border-b pb-4">
+diff --git a/app/bureau/team/actions.ts b/app/bureau/team/actions.ts
+--- a/app/bureau/team/actions.ts
++++ b/app/bureau/team/actions.ts
+@@ -1,67 +1,90 @@
+ 'use server'
+ 
+-import { createClient } from "@/lib/supabase/server";
+-import { revalidatePath } from "next/cache";
++import { revalidatePath } from 'next/cache'
++import { AuthorizationError, requireBureau } from '@/lib/actions/_guards'
+ 
++const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
++const MAX_PHOTO_BYTES = 3 * 1024 * 1024 // 3 Mo
++
++/**
++ * Ajout d'un membre au trombinoscope.
++ *
++ * Avant : seul « un utilisateur est connecté » était vérifié, donc n'importe
++ * quel parent pouvait ajouter un membre au bureau, et le fichier envoyé
++ * (type, taille) n'était pas contrôlé.
++ */
+ export async function addTeamMember(formData: FormData) {
++  let guarded
+   try {
+-    const supabase = await createClient();
+-
+-    // Vérification de l'utilisateur connecté
+-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+-    if (userError || !user) {
+-      return { success: false, error: "Utilisateur non authentifié." };
++    guarded = await requireBureau()
++  } catch (err) {
++    if (err instanceof AuthorizationError) {
++      return { success: false, error: err.message }
+     }
++    throw err
++  }
++  const { supabase } = guarded
+ 
+-    const firstName = formData.get("firstName") as string;
+-    const lastName = formData.get("lastName") as string;
+-    const roleTitle = formData.get("roleTitle") as string;
+-    const photoFile = formData.get("photoFile") as File;
++  try {
++    const firstName = String(formData.get('firstName') ?? '').trim()
++    const lastName = String(formData.get('lastName') ?? '').trim()
++    const roleTitle = String(formData.get('roleTitle') ?? '').trim()
++    const photoFile = formData.get('photoFile')
+ 
+     if (!firstName || !lastName || !roleTitle) {
+-      return { success: false, error: "Veuillez remplir les champs obligatoires (Prénom, Nom, Rôle)." };
++      return { success: false, error: 'Veuillez remplir les champs obligatoires (Prénom, Nom, Rôle).' }
+     }
+ 
+-    let photoUrl = null;
++    let photoUrl: string | null = null
+ 
+-    // Gestion de l'upload de la photo si un fichier est présent et valide
+-    if (photoFile && photoFile.size > 0 && photoFile.name && photoFile.name !== "undefined") {
+-      const fileExt = photoFile.name.split(".").pop();
+-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
++    if (photoFile instanceof File && photoFile.size > 0) {
++      if (!ALLOWED_PHOTO_TYPES.includes(photoFile.type)) {
++        return { success: false, error: 'Photo refusée : formats acceptés JPG, PNG, WEBP ou GIF.' }
++      }
++      if (photoFile.size > MAX_PHOTO_BYTES) {
++        return { success: false, error: 'Photo trop lourde (3 Mo maximum).' }
++      }
++
++      const fileExt = (photoFile.name.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
++      if (!fileExt) {
++        return { success: false, error: 'Le nom du fichier photo n’a pas d’extension.' }
++      }
++      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+ 
+       const { error: uploadError } = await supabase.storage
+-        .from("team-photos")
+-        .upload(fileName, photoFile);
++        .from('team-photos')
++        .upload(fileName, photoFile, { contentType: photoFile.type })
+ 
+       if (uploadError) {
+-        return { success: false, error: "Erreur Storage : " + uploadError.message };
++        return { success: false, error: 'Erreur Storage : ' + uploadError.message }
+       }
+ 
+       const { data: publicUrlData } = supabase.storage
+-        .from("team-photos")
+-        .getPublicUrl(fileName);
++        .from('team-photos')
++        .getPublicUrl(fileName)
+ 
+-      photoUrl = publicUrlData.publicUrl;
++      photoUrl = publicUrlData.publicUrl
+     }
+ 
+-    // Insertion dans la table bureau_members
+-    const { error: insertError } = await supabase.from("bureau_members").insert({
++    const { error: insertError } = await supabase.from('bureau_members').insert({
+       first_name: firstName,
+       last_name: lastName,
+       role_title: roleTitle,
+       photo_url: photoUrl,
+-    });
++    })
+ 
+     if (insertError) {
+-      return { success: false, error: "Erreur Insertion Base de données : " + insertError.message };
++      return { success: false, error: 'Erreur Insertion Base de données : ' + insertError.message }
+     }
+ 
+-    revalidatePath("/about");
+-    revalidatePath("/bureau/team");
++    revalidatePath('/about')
++    revalidatePath('/team')
++    revalidatePath('/bureau/team')
+ 
+-    return { success: true };
+-  } catch (err: any) {
+-    console.error("ERREUR LORS DE L'AJOUT DU MEMBRE:", err.message);
+-    return { success: false, error: err.message || "Une erreur interne est survenue." };
++    return { success: true }
++  } catch (err: unknown) {
++    const message = err instanceof Error ? err.message : 'Une erreur interne est survenue.'
++    console.error('ERREUR LORS DE L’AJOUT DU MEMBRE:', message)
++    return { success: false, error: message }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/app/dashboard/page.tsx b/app/dashboard/page.tsx
+--- a/app/dashboard/page.tsx
++++ b/app/dashboard/page.tsx
+@@ -69,7 +69,7 @@ export default async function DashboardPage() {
+   return (
+     <div className="min-h-screen bg-gray-50 pb-12">
+       <Navbar 
+-        userEmail={user.email} 
++        userEmail={user.email ?? ""}
+         firstName={profile?.first_name} 
+         role={profile?.role} 
+       />
+diff --git a/app/ecole/page.tsx b/app/ecole/page.tsx
+--- a/app/ecole/page.tsx
++++ b/app/ecole/page.tsx
+@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
+ import { createClient } from "@/lib/supabase/client";
+ import { useRouter } from "next/navigation";
+ import Navbar from "@/components/Navbar";
++import { BUREAU_ROLES, hasRole } from '@/types/roles';
+ 
+ export default function EcolePage() {
+   const [user, setUser] = useState<any>(null);
+@@ -57,7 +58,7 @@ export default function EcolePage() {
+     setLoading(false);
+   }
+ 
+-  const isAdminOrBureau = profile?.role && profile.role !== 'parent';
++  const isAdminOrBureau = hasRole(profile?.role, BUREAU_ROLES);
+ 
+   async function handleAdd(e: React.FormEvent) {
+     e.preventDefault();
+@@ -105,7 +106,7 @@ export default function EcolePage() {
+   return (
+     <div className="min-h-screen bg-gray-50 pb-12">
+       <Navbar 
+-        userEmail={user?.email} 
++        userEmail={user?.email ?? ""}
+         firstName={profile?.first_name} 
+         role={profile?.role} 
+       />
+diff --git a/app/events/page.tsx b/app/events/page.tsx
+--- a/app/events/page.tsx
++++ b/app/events/page.tsx
+@@ -62,7 +62,7 @@ export default function EventsPage() {
+     <div className="min-h-screen bg-gray-50 pb-12">
+       {user && (
+         <Navbar 
+-          userEmail={user.email} 
++          userEmail={user.email ?? ""}
+           firstName={profile?.first_name} 
+           role={profile?.role} 
+         />
+diff --git a/app/gallery/page.tsx b/app/gallery/page.tsx
+--- a/app/gallery/page.tsx
++++ b/app/gallery/page.tsx
+@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
+ import { createClient } from '@/lib/supabase/client'
+ import Navbar from '@/components/Navbar'
+ import Link from 'next/link'
++import { BUREAU_ROLES, hasRole } from '@/types/roles'
+ 
+ export default function GalleryIndexPage() {
+   const [user, setUser] = useState<any>(null)
+@@ -34,7 +35,8 @@ export default function GalleryIndexPage() {
+     loadData()
+   }, [])
+ 
+-  const isAdminOrBureau = profile?.role && profile.role !== 'parent'
++  // Liste explicite : un rôle vide ou inconnu n'ouvre pas les outils du bureau.
++  const isAdminOrBureau = hasRole(profile?.role, BUREAU_ROLES)
+ 
+   if (loading) {
+     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-500">Chargement des galeries...</div>
+@@ -42,7 +44,7 @@ export default function GalleryIndexPage() {
+ 
+   return (
+     <div className="min-h-screen bg-gray-50 pb-12">
+-      <Navbar userEmail={user?.email} firstName={profile?.first_name} role={profile?.role} />
++      <Navbar userEmail={user?.email ?? ''} firstName={profile?.first_name} role={profile?.role} />
+ 
+       <div className="mx-auto max-w-6xl p-6 space-y-6">
+         <header className="border-b pb-4 flex justify-between items-center">
+diff --git a/app/gallery/[id]/page.tsx b/app/gallery/[id]/page.tsx
+--- a/app/gallery/[id]/page.tsx
++++ b/app/gallery/[id]/page.tsx
+@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
+ import { createClient } from '@/lib/supabase/client'
+ import { useParams, useRouter } from 'next/navigation'
+ import Navbar from '@/components/Navbar'
++import { BUREAU_ROLES, hasRole } from '@/types/roles'
+ 
+ export default function GalleryDetailPage() {
+   const params = useParams()
+@@ -49,7 +50,8 @@ export default function GalleryDetailPage() {
+     loadData()
+   }, [galleryId])
+ 
+-  const isAdminOrBureau = profile?.role && profile.role !== 'parent'
++  // Liste explicite : un rôle vide ou inconnu n'ouvre pas les outils du bureau.
++  const isAdminOrBureau = hasRole(profile?.role, BUREAU_ROLES)
+ 
+   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+     if (!e.target.files || e.target.files.length === 0) return
+@@ -100,7 +102,7 @@ export default function GalleryDetailPage() {
+ 
+   return (
+     <div className="min-h-screen bg-gray-50 pb-12">
+-      <Navbar userEmail={user?.email} firstName={profile?.first_name} role={profile?.role} />
++      <Navbar userEmail={user?.email ?? ''} firstName={profile?.first_name} role={profile?.role} />
+ 
+       <div className="mx-auto max-w-6xl p-6 space-y-6">
+         <div className="flex items-center justify-between border-b pb-4">
+diff --git a/app/login/page.tsx b/app/login/page.tsx
+--- a/app/login/page.tsx
++++ b/app/login/page.tsx
+@@ -200,13 +200,17 @@ export function AuthForms({
+   );
+ }
+ 
+-export default function LoginPage({
++export default async function LoginPage({
+   searchParams,
+ }: {
+-  searchParams?: { [key: string]: string | string[] | undefined };
++  // Next 16 : `searchParams` est une Promise. Le typer en objet synchrone
++  // faisait que `searchParams.next` et `searchParams.error` valaient toujours
++  // undefined (message d'erreur de callback et `?next=` perdus).
++  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+ }) {
+-  const next = typeof searchParams?.next === "string" ? searchParams.next : undefined;
+-  const hasCallbackError = searchParams?.error === "callback_error";
++  const params = (await searchParams) ?? {};
++  const next = typeof params.next === "string" ? params.next : undefined;
++  const hasCallbackError = params.error === "callback_error";
+ 
+   return (
+     <div className="flex min-h-screen flex-col items-center justify-center p-4">
+diff --git a/app/logo-contest/page.tsx b/app/logo-contest/page.tsx
+--- a/app/logo-contest/page.tsx
++++ b/app/logo-contest/page.tsx
+@@ -3,6 +3,7 @@
+ import { useState, useEffect } from 'react'
+ import { createClient } from '@/lib/supabase/client'
+ import Navbar from '@/components/Navbar'
++import { BUREAU_ROLES, hasRole } from '@/types/roles'
+ 
+ export default function LogoContestPage() {
+   const supabase = createClient()
+@@ -67,11 +68,11 @@ export default function LogoContestPage() {
+     }
+   }
+ 
+-  const isBureau = profile?.role && profile.role !== 'parent'
++  const isBureau = hasRole(profile?.role, BUREAU_ROLES)
+ 
+   return (
+     <div className="min-h-screen bg-gray-50">
+-      <Navbar userEmail={user?.email} firstName={profile?.first_name} role={profile?.role} />
++      <Navbar userEmail={user?.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
+ 
+       <main className="mx-auto max-w-3xl p-6 space-y-8">
+         {/* En-tête et Règlement */}
+diff --git a/app/profile/page.tsx b/app/profile/page.tsx
+--- a/app/profile/page.tsx
++++ b/app/profile/page.tsx
+@@ -163,7 +163,7 @@ export default function ProfilePage() {
+ 
+   return (
+     <div className="min-h-screen bg-gray-50">
+-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
++      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
+ 
+       <main className="mx-auto max-w-4xl p-6 space-y-8">
+         <header className="border-b pb-4">
+diff --git a/app/shop/page.tsx b/app/shop/page.tsx
+--- a/app/shop/page.tsx
++++ b/app/shop/page.tsx
+@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
+ import { createClient } from '@/lib/supabase/client'
+ import Navbar from '@/components/Navbar'
+ import ProductTasksManager from '@/components/ProductTasksManager'
++import { createOrder } from '@/lib/actions/shop'
++import { BUREAU_ROLES, hasRole } from '@/types/roles'
+ 
+ export default function ShopPage() {
+   const supabase = createClient()
+@@ -172,39 +174,37 @@ export default function ShopPage() {
+ 
+   const handleOrder = async (productId: string, quantity: number) => {
+     try {
+-      const product = products.find(p => p.id === productId)
+-      if (product?.is_closed) {
+-        alert("Cette vente est clôturée, il n'est plus possible de commander.")
++      // Prix, état de la vente et utilisateur vérifiés côté serveur : avant,
++      // tout était calculé dans le navigateur (prix falsifiable) et `user.id`
++      // plantait si la session avait expiré.
++      const formData = new FormData()
++      formData.set('productId', productId)
++      formData.set('quantity', String(quantity))
++
++      const result = await createOrder(formData)
++      if (!result.ok) {
++        alert(result.error ?? 'Erreur lors de la commande.')
+         return
+       }
+ 
+-      const totalPrice = (product?.price || 0) * quantity
+-
+-      const { error } = await supabase.from('orders').insert({
+-        user_id: user.id,
+-        product_id: productId,
+-        quantity,
+-        total_price: totalPrice,
+-        status: 'pending'
+-      })
+-
+-      if (error) throw error
+-
+       alert("Commande enregistrée avec succès !")
+-      fetchShopData(user.id)
+-    } catch (error: any) {
++      if (user) fetchShopData(user.id)
++    } catch (error: unknown) {
+       console.error("Erreur commande :", error)
+-      alert("Erreur lors de la commande : " + error.message)
++      const message = error instanceof Error ? error.message : 'Erreur inconnue'
++      alert("Erreur lors de la commande : " + message)
+     }
+   }
+ 
+-  const isBureau = profile?.role && profile.role !== "parent"
++  // Avant : `role !== "parent"`, donc un rôle vide ou inconnu ouvrait les
++  // outils du bureau. La liste vient maintenant de `types/roles.ts`.
++  const isBureau = hasRole(profile?.role, BUREAU_ROLES)
+ 
+   if (!user) return null
+ 
+   return (
+     <div className="min-h-screen bg-gray-50">
+-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
++      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
+ 
+       <main className="mx-auto max-w-4xl p-6 space-y-8">
+         <header className="border-b pb-4">
+diff --git a/app/tasks/page.tsx b/app/tasks/page.tsx
+--- a/app/tasks/page.tsx
++++ b/app/tasks/page.tsx
+@@ -3,6 +3,7 @@
+ import { useState, useEffect } from 'react'
+ import { createClient } from '@/lib/supabase/client'
+ import Navbar from '@/components/Navbar'
++import { BUREAU_ROLES, hasRole } from '@/types/roles'
+ 
+ export default function TasksPage() {
+   const supabase = createClient()
+@@ -28,7 +29,9 @@ export default function TasksPage() {
+       setProfile(profileData)
+ 
+       // Vérification rapide des droits bureau
+-      if (profileData?.role === 'parent') {
++      // Avant : seul `role === 'parent'` était refusé, donc un rôle vide ou
++      // inconnu passait. Liste explicite désormais.
++      if (!hasRole(profileData?.role, BUREAU_ROLES)) {
+         window.location.href = '/dashboard'
+         return
+       }
+@@ -87,7 +90,7 @@ export default function TasksPage() {
+ 
+   return (
+     <div className="min-h-screen bg-gray-50">
+-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
++      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
+ 
+       <main className="mx-auto max-w-5xl p-6 space-y-8">
+         <header className="border-b pb-4 flex justify-between items-center">
+diff --git a/components/AdminFormFeedback.tsx b/components/AdminFormFeedback.tsx
+new file mode 100644
+--- /dev/null
++++ b/components/AdminFormFeedback.tsx
+@@ -0,0 +1,23 @@
++'use client'
++
++import { useEffect } from 'react'
++import { toast } from 'sonner'
++
++/**
++ * Retour utilisateur pour les formulaires `/admin` qui utilisent
++ * `action={serverAction}` : le résultat de l'action (`{ ok, error }`) n'était
++ * affiché nulle part, une erreur était donc totalement silencieuse.
++ */
++export default function AdminFormFeedback({
++  state,
++}: {
++  state?: { ok?: boolean; error?: string } | null
++}) {
++  useEffect(() => {
++    if (!state) return
++    if (state.ok) toast.success('Modification enregistrée.')
++    else if (state.error) toast.error(state.error)
++  }, [state])
++
++  return null
++}
+diff --git a/components/Navbar.tsx b/components/Navbar.tsx
+--- a/components/Navbar.tsx
++++ b/components/Navbar.tsx
+@@ -49,7 +49,9 @@ export default function Navbar({ userEmail, firstName, role }: { userEmail: stri
+     if (role === 'admin') return 'Patron'
+     if (role === 'tresorier') return 'Picsou'
+     if (role === 'secretaire') return 'Biquette'
+-    return firstName || userEmail
++    // `user.email` peut être `null` côté Supabase : on retombe sur une chaîne vide
++    // pour ne pas afficher « null » dans la barre de navigation.
++    return firstName || userEmail || ''
+   }
+ 
+   const displayName = getDisplayName()
+diff --git a/components/StocksManagement.tsx b/components/StocksManagement.tsx
+--- a/components/StocksManagement.tsx
++++ b/components/StocksManagement.tsx
+@@ -1,6 +1,6 @@
+ 'use client'
+ 
+-import { useState, useEffect, useRef } from 'react'
++import { Fragment, useState, useEffect, useRef } from 'react'
+ import { createClient } from '@/lib/supabase/client'
+ import { Html5Qrcode } from 'html5-qrcode'
+ 
+@@ -50,8 +50,14 @@ export default function StocksManagement() {
+ 
+   useEffect(() => {
+     loadInventory()
++    // `stopScanner` est défini plus bas : l'utiliser ici lirait la constante
++    // avant son initialisation (TDZ). On arrête le scanner via la ref.
+     return () => {
+-      stopScanner()
++      const scanner = scannerRef.current
++      scannerRef.current = null
++      if (scanner) {
++        scanner.stop().then(() => scanner.clear()).catch(() => {})
++      }
+     }
+   }, [])
+ 
+@@ -82,6 +88,14 @@ export default function StocksManagement() {
+     const uPrice = parseFloat(unitPrice)
+     const totalCost = qty * uPrice
+ 
++    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(uPrice) || uPrice < 0) {
++      alert('Quantité ou prix unitaire invalide.')
++      return
++    }
++
++    const item = items.find((i) => i.id === selectedItemId)
++    if (!item) return
++
+     const { error } = await supabase.from('inventory_purchases').insert({
+       item_id: selectedItemId,
+       quantity: qty,
+@@ -90,14 +104,27 @@ export default function StocksManagement() {
+       expiration_date: expirationDate || null
+     })
+ 
+-    if (!error) {
+-      setSelectedItemId('')
+-      setQuantity('')
+-      setUnitPrice('')
+-      setSupplier('')
+-      setExpirationDate('')
+-      loadInventory()
++    if (error) {
++      alert("Erreur lors de l'enregistrement de l'achat : " + error.message)
++      return
+     }
++
++    // Avant, le stock global n'était jamais mis à jour : il restait à 0.
++    const { error: stockError } = await supabase
++      .from('inventory_items')
++      .update({ current_stock: (Number(item.current_stock) || 0) + qty })
++      .eq('id', selectedItemId)
++
++    if (stockError) {
++      console.error('Erreur mise à jour du stock :', stockError)
++    }
++
++    setSelectedItemId('')
++    setQuantity('')
++    setUnitPrice('')
++    setSupplier('')
++    setExpirationDate('')
++    loadInventory()
+   }
+ 
+   // Mettre à jour le code-barres d'un article existant
+@@ -161,7 +188,11 @@ export default function StocksManagement() {
+     setEditingBarcodeId(null)
+   }
+ 
+-  const calculatedTotal = (quantity && unitPrice) ? (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) : '0.00'
++  // Avant : `parseFloat(quantity)` seul, donc un total à « 0.00 ».
++  const calculatedTotal =
++    quantity && unitPrice && !Number.isNaN(Number(quantity)) && !Number.isNaN(Number(unitPrice))
++      ? (Number(quantity) * Number(unitPrice)).toFixed(2)
++      : '0.00'
+ 
+   if (loading) {
+     return <div className="text-center py-12 text-gray-500 text-sm">Chargement de la réserve...</div>
+@@ -378,7 +409,9 @@ export default function StocksManagement() {
+                   const isExpanded = expandedItemId === item.id
+ 
+                   return (
+-                    <tr key={item.id} className="contents">
++                    // Un <tr> ne peut pas en contenir d'autres : React signalait
++                    // une erreur d'hydratation à chaque ligne du tableau.
++                    <Fragment key={item.id}>
+                       <tr 
+                         className={`hover:bg-gray-50 cursor-pointer transition ${isExpanded ? 'bg-purple-50/50' : ''}`}
+                         onClick={() => toggleExpand(item.id)}
+@@ -514,7 +547,7 @@ export default function StocksManagement() {
+                           </td>
+                         </tr>
+                       )}
+-                    </tr>
++                    </Fragment>
+                   )
+                 })
+               )}
+diff --git a/components/TeamForm.tsx b/components/TeamForm.tsx
+--- a/components/TeamForm.tsx
++++ b/components/TeamForm.tsx
+@@ -1,63 +1,42 @@
+ 'use client'
+ 
+ import { useState } from 'react'
+-import { createClient } from '@/lib/supabase/client'
+ import { useRouter } from 'next/navigation'
+-
++import { addTeamMember } from '@/app/bureau/team/actions'
++
++/**
++ * Formulaire d'ajout d'un membre du bureau.
++ *
++ * Corrections :
++ *  - ligne 60 : `setErrorMsg(err.message ||Une erreur est survenue)` n'avait
++ *    pas de guillemets (TS1005) et empêchait le fichier de compiler ;
++ *  - l'insertion passait par le client Supabase du navigateur : elle est
++ *    maintenant faite par une Server Action qui vérifie le rôle et le type
++ *    du fichier photo.
++ */
+ export default function TeamForm() {
+   const [loading, setLoading] = useState(false)
+   const [errorMsg, setErrorMsg] = useState('')
+   const router = useRouter()
+-  const supabase = createClient()
+ 
+   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+     e.preventDefault()
++    const form = e.currentTarget
++
+     setLoading(true)
+     setErrorMsg('')
+ 
+-    const formData = new FormData(e.currentTarget)
+-    const firstName = formData.get('firstName') as string
+-    const lastName = formData.get('lastName') as string
+-    const roleTitle = formData.get('roleTitle') as string
+-    const photoFile = formData.get('photoFile') as File
+-
+     try {
+-      let photoUrl = null
+-
+-      // 1. Upload de la photo si présente
+-      if (photoFile && photoFile.size > 0 && photoFile.name !== 'undefined') {
+-        const fileExt = photoFile.name.split('.').pop()
+-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+-
+-        const { error: uploadError } = await supabase.storage
+-          .from('team-photos')
+-          .upload(fileName, photoFile)
+-
+-        if (uploadError) throw new Error("Erreur lors de l'upload : " + uploadError.message)
++      const formData = new FormData(form)
++      const result = await addTeamMember(formData)
++      if (!result.success) throw new Error(result.error ?? 'Erreur lors de l’ajout.')
+ 
+-        const { data: publicUrlData } = supabase.storage
+-          .from('team-photos')
+-          .getPublicUrl(fileName)
+-
+-        photoUrl = publicUrlData.publicUrl
+-      }
+-
+-      // 2. Insertion dans la base de données
+-      const { error: insertError } = await supabase.from('bureau_members').insert({
+-        first_name: firstName,
+-        last_name: lastName,
+-        role_title: roleTitle,
+-        photo_url: photoUrl,
+-      })
+-
+-      if (insertError) throw new Error("Erreur d'insertion : " + insertError.message)
+-
+-      // Réinitialiser le formulaire et rafraîchir la page
+-      e.currentTarget.reset()
++      form.reset()
+       router.refresh()
+-    } catch (err: any) {
++    } catch (err: unknown) {
+       console.error(err)
+-      setErrorMsg(err.message ||Une erreur est survenue)
++      const message = err instanceof Error ? err.message : ''
++      setErrorMsg(message || 'Une erreur est survenue')
+     } finally {
+       setLoading(false)
+     }
+@@ -97,36 +76,35 @@ export default function TeamForm() {
+           </div>
+         </div>
+ 
+-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+-          <div>
+-            <label className="block text-xs font-medium text-gray-700 mb-1">Fonction / Rôle (affiché) *</label>
+-            <input
+-              type="text"
+-              name="roleTitle"
+-              required
+-              placeholder="Ex: Président, Trésorier..."
+-              className="w-full p-2 border rounded-md text-sm text-gray-900"
+-            />
+-          </div>
+-          <div>
+-            <label className="block text-xs font-medium text-gray-700 mb-1">Photo depuis le PC (optionnel)</label>
+-            <input
+-              type="file"
+-              name="photoFile"
+-              accept="image/*"
+-              className="w-full p-1.5 border rounded-md text-sm text-gray-900 bg-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"
+-            />
+-          </div>
++        <div>
++          <label className="block text-xs font-medium text-gray-700 mb-1">Rôle affiché *</label>
++          <input
++            type="text"
++            name="roleTitle"
++            required
++            placeholder="Ex: Trésorière"
++            className="w-full p-2 border rounded-md text-sm text-gray-900"
++          />
++        </div>
++
++        <div>
++          <label className="block text-xs font-medium text-gray-700 mb-1">Photo (facultatif)</label>
++          <input
++            type="file"
++            name="photoFile"
++            accept="image/jpeg,image/png,image/webp,image/gif"
++            className="w-full p-2 border rounded-md text-sm text-gray-900 bg-white"
++          />
+         </div>
+ 
+         <button
+           type="submit"
+           disabled={loading}
+-          className="w-full bg-purple-700 text-white text-sm py-2 rounded-md hover:bg-purple-800 transition font-medium cursor-pointer disabled:opacity-50"
++          className="w-full bg-purple-700 hover:bg-purple-800 disabled:bg-gray-400 text-white text-sm font-medium py-2 rounded-lg transition cursor-pointer"
+         >
+-          {loading ? "Enregistrement en cours..." : "+ Enregistrer le membre"}
++          {loading ? 'Ajout en cours...' : 'Ajouter le membre'}
+         </button>
+       </form>
+     </div>
+   )
+-}
+\ No newline at end of file
++}
+diff --git a/lib/actions/admin.ts b/lib/actions/admin.ts
+--- a/lib/actions/admin.ts
++++ b/lib/actions/admin.ts
+@@ -1,112 +1,73 @@
+ 'use server'
+ 
+-import { createClient } from '@/lib/supabase/server'
+ import { revalidatePath } from 'next/cache'
++import { requireAdmin } from './_guards'
++import { ALL_ROLES, type Role } from '@/types/roles'
+ 
+-// Rôles autorisés à gérer l'association (rôles et indicateurs financiers)
+-const MANAGER_ROLES: readonly string[] = ['president', 'admin']
+-
+-// Doit rester identique à la liste de la fonction SQL public.set_user_role
+-const ASSIGNABLE_ROLES: readonly string[] = [
+-  'parent',
+-  'bureau',
+-  'membre_codir',
+-  'president',
+-  'vice_president',
+-  'secretaire',
+-  'vice_secretaire',
+-  'tresorier',
+-  'vice_tresorier',
+-  'admin',
+-]
+-
+-const UUID_RE =
+-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
++export type AdminFormState = { ok: boolean; error?: string }
+ 
+ /**
+- * Vérifie la session puis le rôle de l'appelant.
+- * Lance une erreur si l'utilisateur n'est pas connecté ou n'a pas le droit.
++ * Change le rôle d'un membre.
++ *
++ * Avant : aucune validation de `role` (n'importe quelle chaîne était écrite en
++ * base, y compris une valeur qui ne correspond à aucun rôle) et un admin
++ * pouvait retirer son propre rôle d'admin, se verrouillant dehors.
+  */
+-async function requireRole(allowed: readonly string[]) {
+-  const supabase = await createClient()
++export async function updateUserRole(formData: FormData): Promise<AdminFormState> {
++  const { supabase, user } = await requireAdmin()
+ 
+-  const {
+-    data: { user },
+-  } = await supabase.auth.getUser()
+-  if (!user) throw new Error('Non autorisé')
++  const targetUserId = String(formData.get('userId') ?? '')
++  const rawRole = String(formData.get('role') ?? '').trim().toLowerCase()
+ 
+-  const { data: profile } = await supabase
+-    .from('profiles')
+-    .select('role')
+-    .eq('id', user.id)
+-    .single()
+-
+-  if (!profile || !allowed.includes(profile.role)) {
+-    throw new Error('Droit refusé : réservé à la Présidence ou Administration')
++  if (!targetUserId) {
++    return { ok: false, error: 'Utilisateur cible manquant.' }
+   }
+ 
+-  return { supabase, user, role: profile.role as string }
+-}
+-
+-/** Convertit un champ de formulaire en montant valide (accepte "12,50"). */
+-function parseAmount(value: FormDataEntryValue | null, label: string): number {
+-  const raw =
+-    typeof value === 'string' ? value.trim().replace(/\s/g, '').replace(',', '.') : ''
+-
+-  if (raw === '') throw new Error(`${label} : valeur manquante`)
+-
+-  const amount = Number(raw)
+-  if (!Number.isFinite(amount) || amount < 0 || amount > 10_000_000) {
+-    throw new Error(`${label} : montant invalide`)
++  if (!(ALL_ROLES as readonly string[]).includes(rawRole)) {
++    return { ok: false, error: `Rôle invalide : « ${rawRole} ».` }
+   }
+-
+-  return Math.round(amount * 100) / 100
+-}
+-
+-export async function updateUserRole(formData: FormData) {
+-  const { supabase, user, role: callerRole } = await requireRole(MANAGER_ROLES)
+-
+-  const targetUserId = formData.get('userId')
+-  const newRole = formData.get('role')
+-
+-  if (typeof targetUserId !== 'string' || !UUID_RE.test(targetUserId)) {
+-    throw new Error('Utilisateur invalide')
+-  }
+-  if (typeof newRole !== 'string' || !ASSIGNABLE_ROLES.includes(newRole)) {
+-    throw new Error('Rôle invalide')
+-  }
+-  if (targetUserId === user.id) {
+-    throw new Error('Tu ne peux pas modifier ton propre rôle')
+-  }
+-  if (newRole === 'admin' && callerRole !== 'admin') {
+-    throw new Error('Seul un administrateur peut nommer un administrateur')
++  const newRole = rawRole as Role
++
++  // Se retirer soi-même ses droits d'administration coupe l'accès à /admin.
++  if (targetUserId === user.id && newRole !== 'admin') {
++    return {
++      ok: false,
++      error: 'Tu ne peux pas retirer ton propre rôle d’administrateur.',
++    }
+   }
+ 
+-  // Le changement passe par une fonction SQL sécurisée (la colonne role
+-  // n'est plus modifiable directement depuis le client).
+-  const { error } = await supabase.rpc('set_user_role', {
+-    target: targetUserId,
+-    new_role: newRole,
+-  })
++  const { error } = await supabase
++    .from('profiles')
++    .update({ role: newRole })
++    .eq('id', targetUserId)
+ 
+   if (error) {
+     console.error('Erreur mise à jour rôle :', error)
+-    throw new Error('Impossible de modifier le rôle')
++    return { ok: false, error: 'Impossible de mettre à jour le rôle.' }
+   }
+ 
+   revalidatePath('/admin')
++  return { ok: true }
+ }
+ 
+-export async function updateAssociationStats(formData: FormData) {
+-  const { supabase } = await requireRole(MANAGER_ROLES)
++/** Met à jour les indicateurs financiers affichés sur le tableau de bord. */
++export async function updateAssociationStats(formData: FormData): Promise<AdminFormState> {
++  const { supabase } = await requireAdmin()
+ 
+-  const totalProfits = parseAmount(formData.get('totalProfits'), 'Bénéfices totaux')
+-  const totalSchoolExpenses = parseAmount(
+-    formData.get('totalSchoolExpenses'),
+-    'Dépenses pour l\'école'
+-  )
++  const parseAmount = (value: FormDataEntryValue | null): number | null => {
++    if (value === null || String(value).trim() === '') return 0
++    const parsed = Number(String(value).replace(',', '.'))
++    if (!Number.isFinite(parsed) || parsed < 0) return null
++    return Math.round(parsed * 100) / 100
++  }
++
++  const totalProfits = parseAmount(formData.get('totalProfits'))
++  const totalSchoolExpenses = parseAmount(formData.get('totalSchoolExpenses'))
++
++  if (totalProfits === null || totalSchoolExpenses === null) {
++    return { ok: false, error: 'Les montants doivent être des nombres positifs.' }
++  }
+ 
+-  // Mise à jour de la table association_stats (ligne id = 1)
+   const { error } = await supabase
+     .from('association_stats')
+     .update({
+@@ -117,10 +78,11 @@ export async function updateAssociationStats(formData: FormData) {
+     .eq('id', 1)
+ 
+   if (error) {
+-    console.error('Erreur mise à jour des stats de l\'association :', error)
+-    throw new Error('Erreur lors de la mise à jour des indicateurs financiers')
++    console.error('Erreur mise à jour des stats de l’association :', error)
++    return { ok: false, error: 'Erreur lors de la mise à jour des indicateurs financiers.' }
+   }
+ 
+   revalidatePath('/admin')
+   revalidatePath('/dashboard')
+-}
+\ No newline at end of file
++  return { ok: true }
++}
+diff --git a/lib/actions/auth.ts b/lib/actions/auth.ts
+--- a/lib/actions/auth.ts
++++ b/lib/actions/auth.ts
+@@ -3,44 +3,64 @@
+ import { createClient } from '@/lib/supabase/server'
+ import { redirect } from 'next/navigation'
+ 
+-export async function signIn(formData: FormData) {
+-  const email = formData.get('email') as string
+-  const password = formData.get('password') as string
+-  const next = (formData.get('next') as string) || '/dashboard'
++/** N'accepte qu'un chemin interne : évite une redirection ouverte via `?next=`. */
++function safeNext(value: FormDataEntryValue | null): string {
++  const next = typeof value === 'string' ? value : ''
++  if (!next.startsWith('/') || next.startsWith('//')) return '/dashboard'
++  return next
++}
++
++export type AuthResult =
++  | { ok: false; error: string; fieldErrors?: Record<string, string> }
++  | { ok: true; message?: string }
++
++export async function signIn(formData: FormData): Promise<AuthResult> {
++  const email = String(formData.get('email') ?? '').trim()
++  const password = String(formData.get('password') ?? '')
++  const next = safeNext(formData.get('next'))
++
++  const fieldErrors: Record<string, string> = {}
++  if (!email) fieldErrors.email = "L'adresse e-mail est obligatoire."
++  if (!password) fieldErrors.password = 'Le mot de passe est obligatoire.'
++  if (Object.keys(fieldErrors).length > 0) {
++    return { ok: false, error: 'Vérifie les champs du formulaire.', fieldErrors }
++  }
+ 
+   const supabase = await createClient()
+ 
+-  const { error } = await supabase.auth.signInWithPassword({
+-    email,
+-    password,
+-  })
++  const { error } = await supabase.auth.signInWithPassword({ email, password })
+ 
+   if (error) {
+     return {
+       ok: false,
+-      error: error.message === 'Invalid login credentials' 
+-        ? 'Identifiants incorrects' 
+-        : error.message,
++      error:
++        error.message === 'Invalid login credentials'
++          ? 'Identifiants incorrects'
++          : error.message,
+     }
+   }
+ 
+   redirect(next)
+ }
+ 
+-export async function signUp(formData: FormData) {
+-  const email = formData.get('email') as string
+-  const password = formData.get('password') as string
+-  const confirmPassword = formData.get('confirmPassword') as string
+-  const firstName = formData.get('firstName') as string
+-  const lastName = formData.get('lastName') as string
++export async function signUp(formData: FormData): Promise<AuthResult> {
++  const email = String(formData.get('email') ?? '').trim()
++  const password = String(formData.get('password') ?? '')
++  const confirmPassword = String(formData.get('confirmPassword') ?? '')
++  const firstName = String(formData.get('firstName') ?? '').trim()
++  const lastName = String(formData.get('lastName') ?? '').trim()
++  const phone = String(formData.get('phone') ?? '').trim()
+ 
+-  // Validation basique
++  const fieldErrors: Record<string, string> = {}
++  if (!firstName) fieldErrors.firstName = 'Le prénom est obligatoire.'
++  if (!lastName) fieldErrors.lastName = 'Le nom est obligatoire.'
++  if (!email) fieldErrors.email = "L'adresse e-mail est obligatoire."
++  if (password.length < 8) fieldErrors.password = 'Le mot de passe doit faire au moins 8 caractères.'
+   if (password !== confirmPassword) {
+-    return {
+-      ok: false,
+-      error: 'Les mots de passe ne correspondent pas.',
+-      fieldErrors: { confirmPassword: 'Les mots de passe doivent être identiques' },
+-    }
++    fieldErrors.confirmPassword = 'Les mots de passe doivent être identiques'
++  }
++  if (Object.keys(fieldErrors).length > 0) {
++    return { ok: false, error: 'Vérifie les champs du formulaire.', fieldErrors }
+   }
+ 
+   const supabase = await createClient()
+@@ -52,24 +72,20 @@ export async function signUp(formData: FormData) {
+       data: {
+         first_name: firstName,
+         last_name: lastName,
++        phone: phone || null,
+       },
+     },
+   })
+ 
+   if (error) {
+-    return {
+-      ok: false,
+-      error: error.message,
+-    }
++    return { ok: false, error: error.message }
+   }
+ 
+-  return {
+-    ok: true,
+-    message: 'Compte créé avec succès !',
+-  }
++  return { ok: true, message: 'Compte créé avec succès !' }
+ }
++
+ export async function signOut() {
+   const supabase = await createClient()
+   await supabase.auth.signOut()
+   redirect('/login')
+-}
+\ No newline at end of file
++}
+diff --git a/lib/actions/events.ts b/lib/actions/events.ts
+--- a/lib/actions/events.ts
++++ b/lib/actions/events.ts
+@@ -1,52 +1,86 @@
+ 'use server'
+ 
+-import { createClient } from '@/lib/supabase/server'
+ import { revalidatePath } from 'next/cache'
++import { AuthorizationError, requireBureau, requireUser } from './_guards'
+ 
++/**
++ * Création d'un événement.
++ *
++ * Avant : `visibility` et `event_date` venaient du formulaire sans contrôle
++ * (une date vide ou invalide partait en base) et aucune vérification de rôle
++ * n'était faite autrement que par la RLS.
++ */
+ export async function createEvent(formData: FormData) {
++  let guarded
+   try {
+-    const supabase = await createClient()
+-
+-    const { data: { user } } = await supabase.auth.getUser()
+-    if (!user) throw new Error('Non autorisé')
+-
+-    const title = formData.get('title') as string
+-    const description = formData.get('description') as string
+-    const event_date = formData.get('event_date') as string
+-    const location = formData.get('location') as string
+-    const visibility = formData.get('visibility') as string || 'public'
+-    const image_url = formData.get('image_url') as string || null
+-
+-    const { error } = await supabase.from('events').insert({
+-      title,
+-      description,
+-      event_date,
+-      location,
+-      visibility,
+-      is_internal: visibility !== 'public',
+-      image_url,
+-    })
+-
+-    if (error) {
+-      console.error('Erreur insertion base de données :', error.message)
+-      throw new Error(`Erreur base de données : ${error.message}`)
+-    }
+-
+-    revalidatePath('/events')
+-  } catch (err: any) {
+-    console.error('Erreur globale createEvent :', err.message)
++    guarded = await requireBureau()
++  } catch (err) {
++    if (err instanceof AuthorizationError) return { ok: false, error: err.message }
+     throw err
+   }
++  const { supabase } = guarded
++
++  const title = String(formData.get('title') ?? '').trim()
++  if (!title) return { ok: false, error: 'Le titre est obligatoire.' }
++
++  const rawDate = String(formData.get('event_date') ?? '')
++  const eventDate = new Date(rawDate)
++  if (!rawDate || Number.isNaN(eventDate.getTime())) {
++    return { ok: false, error: 'Date de l’événement invalide.' }
++  }
++
++  const description = String(formData.get('description') ?? '')
++  const location = String(formData.get('location') ?? '').trim()
++  const visibility = String(formData.get('visibility') ?? 'public') === 'private' ? 'private' : 'public'
++  const image_url = String(formData.get('image_url') ?? '').trim() || null
++
++  const { error } = await supabase.from('events').insert({
++    title,
++    description,
++    event_date: eventDate.toISOString(),
++    location: location || null,
++    visibility,
++    is_internal: visibility !== 'public',
++    image_url,
++  })
++
++  if (error) {
++    console.error('Erreur insertion base de données :', error.message)
++    return { ok: false, error: `Erreur base de données : ${error.message}` }
++  }
++
++  revalidatePath('/events')
++  revalidatePath('/dashboard')
++  return { ok: true }
+ }
+ 
++/**
++ * Inscription d'un bénévole à un créneau.
++ *
++ * Avant : un double clic créait deux inscriptions (aucune contrainte gérée
++ * côté action) et une erreur d'insertion était avalée (`return` sans message),
++ * le formulaire semblait avoir fonctionné.
++ */
+ export async function registerVolunteer(formData: FormData) {
+-  const supabase = await createClient()
++  const { supabase, user } = await requireUser()
++
++  const eventId = String(formData.get('eventId') ?? '')
++  const roleNeeded = String(formData.get('roleNeeded') ?? '').trim()
+ 
+-  const { data: { user } } = await supabase.auth.getUser()
+-  if (!user) throw new Error('Non autorisé')
++  if (!eventId) return { ok: false, error: 'Événement manquant.' }
++  if (!roleNeeded) return { ok: false, error: 'Créneau manquant.' }
+ 
+-  const eventId = formData.get('eventId') as string
+-  const roleNeeded = formData.get('roleNeeded') as string
++  const { data: existing } = await supabase
++    .from('event_volunteers')
++    .select('id')
++    .eq('event_id', eventId)
++    .eq('user_id', user.id)
++    .eq('role', roleNeeded)
++    .maybeSingle()
++
++  if (existing) {
++    return { ok: false, error: 'Tu es déjà inscrit à ce créneau.' }
++  }
+ 
+   const { error } = await supabase.from('event_volunteers').insert({
+     event_id: eventId,
+@@ -56,8 +90,9 @@ export async function registerVolunteer(formData: FormData) {
+ 
+   if (error) {
+     console.error('Erreur inscription bénévole :', error)
+-    return
++    return { ok: false, error: 'Impossible de t’inscrire à ce créneau.' }
+   }
+ 
+   revalidatePath('/events')
+-}
+\ No newline at end of file
++  return { ok: true }
++}
+diff --git a/lib/actions/membership.ts b/lib/actions/membership.ts
+--- a/lib/actions/membership.ts
++++ b/lib/actions/membership.ts
+@@ -1,42 +1,101 @@
+ 'use server'
+ 
+-import { createClient } from '@/lib/supabase/server'
+ import { revalidatePath } from 'next/cache'
++import { AuthorizationError, requireBureau, requireUser } from './_guards'
++import { hasRole } from '@/types/roles'
+ 
++const PAYMENT_METHODS = ['helloasso', 'cheque', 'especes', 'virement'] as const
++type PaymentMethod = (typeof PAYMENT_METHODS)[number]
++
++/**
++ * Adhésion d'une famille.
++ *
++ * Avant : `status: 'validated'` dès que le moyen de paiement était HelloAsso,
++ * donc une adhésion validée sans qu'aucun paiement n'ait été confirmé, et le
++ * montant provenait du formulaire sans contrôle.
++ */
+ export async function submitMembership(formData: FormData) {
+-  const supabase = await createClient()
++  const { supabase, user } = await requireUser()
++
++  const schoolYear = String(formData.get('schoolYear') ?? '').trim()
++  if (!/^\d{4}-\d{4}$/.test(schoolYear)) {
++    return { ok: false, error: 'Année scolaire invalide (format attendu : 2026-2027).' }
++  }
+ 
+-  const { data: { user } } = await supabase.auth.getUser()
+-  if (!user) throw new Error('Non autorisé')
++  const rawAmount = String(formData.get('amount') ?? '').replace(',', '.')
++  const amount = rawAmount === '' ? 5 : Number(rawAmount)
++  if (!Number.isFinite(amount) || amount <= 0 || amount > 100) {
++    return { ok: false, error: 'Montant invalide.' }
++  }
+ 
+-  const schoolYear = formData.get('schoolYear') as string
+-  const amount = parseFloat(formData.get('amount') as string) || 5.00
+-  const paymentMethod = formData.get('paymentMethod') as string
++  const rawMethod = String(formData.get('paymentMethod') ?? '').trim().toLowerCase()
++  if (!(PAYMENT_METHODS as readonly string[]).includes(rawMethod)) {
++    return { ok: false, error: 'Moyen de paiement invalide.' }
++  }
++  const paymentMethod = rawMethod as PaymentMethod
+ 
+   const { error } = await supabase.from('memberships').insert({
+     user_id: user.id,
+     school_year: schoolYear,
+-    amount,
++    amount: Math.round(amount * 100) / 100,
+     payment_method: paymentMethod,
+-    status: paymentMethod === 'helloasso' ? 'validated' : 'pending',
++    // Aucun moyen de paiement n'est confirmé par le client : l'adhésion reste
++    // à valider par le bureau, HelloAsso compris, tant que le webhook de
++    // paiement n'existe pas.
++    status: 'pending',
+   })
+ 
+   if (error) {
+     console.error('Erreur adhésion :', error)
+-    return
++    return { ok: false, error: 'Impossible d’enregistrer l’adhésion.' }
+   }
+ 
+   revalidatePath('/membership')
++  return { ok: true }
+ }
+ 
++const MEMBERSHIP_STATUSES = ['pending', 'validated', 'rejected'] as const
++
++/**
++ * Validation d'une adhésion par le bureau.
++ *
++ * Avant : seule la présence d'un utilisateur connecté était vérifiée, donc
++ * n'importe quel parent pouvait valider sa propre adhésion.
++ */
+ export async function updateMembershipStatus(formData: FormData) {
+-  const supabase = await createClient()
++  let guarded
++  try {
++    guarded = await requireBureau()
++  } catch (err) {
++    if (err instanceof AuthorizationError) {
++      return { ok: false, error: err.message }
++    }
++    throw err
++  }
++  const { supabase, user, role } = guarded
++
++  const membershipId = String(formData.get('membershipId') ?? '')
++  const status = String(formData.get('status') ?? '').trim().toLowerCase()
+ 
+-  const { data: { user } } = await supabase.auth.getUser()
+-  if (!user) throw new Error('Non autorisé')
++  if (!membershipId) return { ok: false, error: 'Adhésion manquante.' }
++  if (!(MEMBERSHIP_STATUSES as readonly string[]).includes(status)) {
++    return { ok: false, error: 'Statut invalide.' }
++  }
++
++  // Un membre du bureau ne valide pas sa propre adhésion.
++  const { data: membership, error: readError } = await supabase
++    .from('memberships')
++    .select('id, user_id')
++    .eq('id', membershipId)
++    .single()
+ 
+-  const membershipId = formData.get('membershipId') as string
+-  const status = formData.get('status') as string
++  if (readError || !membership) {
++    return { ok: false, error: 'Adhésion introuvable.' }
++  }
++
++  if (membership.user_id === user.id && !hasRole(role, ['admin', 'president'] as const)) {
++    return { ok: false, error: 'Tu ne peux pas valider ta propre adhésion.' }
++  }
+ 
+   const { error } = await supabase
+     .from('memberships')
+@@ -45,8 +104,9 @@ export async function updateMembershipStatus(formData: FormData) {
+ 
+   if (error) {
+     console.error('Erreur mise à jour adhésion :', error)
+-    return
++    return { ok: false, error: 'Impossible de mettre à jour l’adhésion.' }
+   }
+ 
+   revalidatePath('/membership')
+-}
+\ No newline at end of file
++  return { ok: true }
++}
+diff --git a/lib/actions/shop.ts b/lib/actions/shop.ts
+--- a/lib/actions/shop.ts
++++ b/lib/actions/shop.ts
+@@ -1,56 +1,107 @@
+ 'use server'
+ 
+-import { createClient } from '@/lib/supabase/server'
+ import { revalidatePath } from 'next/cache'
+-
++import { AuthorizationError, requireBureau, requireUser } from './_guards'
++
++// Types minimaux : le projet n'a pas encore de `Database` généré
++// (`lib/database.type.ts` vaut `any`), on se contente du nécessaire.
++type ProductRow = { price: number | null; is_closed: boolean | null }
++
++/**
++ * Création / modification d'un produit de la boutique.
++ *
++ * Avant : seule la présence d'un utilisateur connecté était vérifiée, donc
++ * n'importe quel parent pouvait publier un produit.
++ */
+ export async function createProduct(formData: FormData) {
+-  const supabase = await createClient()
++  let guarded
++  try {
++    guarded = await requireBureau()
++  } catch (err) {
++    if (err instanceof AuthorizationError) return { ok: false, error: err.message }
++    throw err
++  }
++  const { supabase } = guarded
+ 
+-  const { data: { user } } = await supabase.auth.getUser()
+-  if (!user) throw new Error('Non autorisé')
++  const name = String(formData.get('name') ?? '').trim()
++  if (!name) return { ok: false, error: 'Le nom du produit est obligatoire.' }
++
++  const rawPrice = String(formData.get('price') ?? '').replace(',', '.')
++  const price = rawPrice === '' ? 0 : Number(rawPrice)
++  if (!Number.isFinite(price) || price < 0 || price > 5000) {
++    return { ok: false, error: 'Prix invalide.' }
++  }
+ 
+-  const name = formData.get('name') as string
+-  const description = formData.get('description') as string
+-  const price = parseFloat(formData.get('price') as string) || 0
+-  const external_link = formData.get('external_link') as string
+-  const start_date = formData.get('start_date') as string
+-  const end_date = formData.get('end_date') as string
++  const description = String(formData.get('description') ?? '').trim()
++  const externalLink = String(formData.get('external_link') ?? '').trim()
++  if (externalLink && !/^https:\/\//i.test(externalLink)) {
++    return { ok: false, error: 'Le lien externe doit commencer par https://' }
++  }
++
++  const startDate = String(formData.get('start_date') ?? '')
++  const endDate = String(formData.get('end_date') ?? '')
++  if (startDate && endDate && startDate > endDate) {
++    return { ok: false, error: 'La date de fin précède la date de début.' }
++  }
+ 
+   const { error } = await supabase.from('products').insert({
+     name,
+-    description,
+-    price,
+-    external_link,
+-    start_date: start_date || null,
+-    end_date: end_date || null,
++    description: description || null,
++    price: Math.round(price * 100) / 100,
++    external_link: externalLink || null,
++    start_date: startDate || null,
++    end_date: endDate || null,
+   })
+ 
+   if (error) {
+     console.error('Erreur lors de la création du produit :', error)
+-    return
++    return { ok: false, error: 'Impossible de créer le produit.' }
+   }
+ 
+   revalidatePath('/shop')
++  return { ok: true }
+ }
+ 
++/**
++ * Commande d'un produit.
++ *
++ * Le prix et l'état de la vente sont relus en base côté serveur : le client
++ * envoyait auparavant un prix et un statut calculés dans le navigateur, donc
++ * modifiables (commande à 0 €), et son `user.id` pouvait être absent.
++ */
+ export async function createOrder(formData: FormData) {
+-  const supabase = await createClient()
++  const { supabase, user } = await requireUser()
+ 
+-  const { data: { user } } = await supabase.auth.getUser()
+-  if (!user) throw new Error('Non autorisé')
++  const productId = String(formData.get('productId') ?? '')
++  const quantity = Number.parseInt(String(formData.get('quantity') ?? ''), 10)
+ 
+-  const productId = formData.get('productId') as string
+-  const quantity = parseInt(formData.get('quantity') as string, 10)
++  if (!productId) return { ok: false, error: 'Produit manquant.' }
++  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
++    return { ok: false, error: 'Quantité invalide (entre 1 et 99).' }
++  }
+ 
+-  const { data: product } = await supabase
++  // Les colonnes réellement ajoutées (`is_closed`) ne sont pas typées dans le
++  // projet ; la lecture est donc faite via un cast minimal.
++  const { data: product, error: productError } = await supabase
+     .from('products')
+-    .select('price')
++    .select('*')
+     .eq('id', productId)
+     .single()
+ 
+-  if (!product) throw new Error('Produit introuvable')
++  if (productError || !product) {
++    return { ok: false, error: 'Produit introuvable.' }
++  }
++
++  const productRow = product as ProductRow
++  if (productRow.is_closed) {
++    return { ok: false, error: 'Cette vente est clôturée.' }
++  }
+ 
+-  const totalPrice = product.price * quantity
++  const unitPrice = Number(productRow.price ?? 0)
++  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
++    return { ok: false, error: 'Prix du produit invalide.' }
++  }
++  const totalPrice = Math.round(unitPrice * quantity * 100) / 100
+ 
+   const { error } = await supabase.from('orders').insert({
+     user_id: user.id,
+@@ -62,8 +113,9 @@ export async function createOrder(formData: FormData) {
+ 
+   if (error) {
+     console.error('Erreur commande :', error)
+-    return
++    return { ok: false, error: 'Impossible d’enregistrer la commande.' }
+   }
+ 
+   revalidatePath('/shop')
+-}
+\ No newline at end of file
++  return { ok: true, totalPrice }
++}
+diff --git a/lib/actions/_guards.ts b/lib/actions/_guards.ts
+new file mode 100644
+--- /dev/null
++++ b/lib/actions/_guards.ts
+@@ -0,0 +1,79 @@
++import 'server-only'
++import type { SupabaseClient, User } from '@supabase/supabase-js'
++import { createClient } from '@/lib/supabase/server'
++import {
++  ADMIN_ROLES,
++  BUREAU_ROLES,
++  hasRole,
++  normalizeRole,
++  type Role,
++} from '@/types/roles'
++
++/**
++ * Gardes d'autorisation pour les Server Actions.
++ *
++ * Constat de la revue : plusieurs actions (`sendPushNotification`,
++ * `updateMembershipStatus`, `createProduct`, `addTeamMember`) se contentaient
++ * de vérifier « un utilisateur est connecté ». N'importe quel parent pouvait
++ * donc valider sa propre adhésion, publier un produit ou envoyer une
++ * notification à toute l'association. Ces gardes vérifient le rôle côté
++ * serveur, avant toute écriture.
++ */
++
++export type Guarded = {
++  supabase: SupabaseClient<any, 'public', any>
++  user: User
++  role: Role
++}
++
++export class AuthorizationError extends Error {
++  constructor(message = 'Droit refusé.') {
++    super(message)
++    this.name = 'AuthorizationError'
++  }
++}
++
++/** Récupère l'utilisateur connecté et son rôle normalisé, ou lève une erreur. */
++export async function requireUser(): Promise<Guarded> {
++  const supabase = await createClient()
++  const {
++    data: { user },
++  } = await supabase.auth.getUser()
++
++  if (!user) throw new AuthorizationError('Non authentifié.')
++
++  const { data: profile } = await supabase
++    .from('profiles')
++    .select('role')
++    .eq('id', user.id)
++    .single()
++
++  const role = normalizeRole(profile?.role)
++  if (!role) throw new AuthorizationError('Rôle inconnu.')
++
++  return { supabase, user, role }
++}
++
++/** Garde générique : l'utilisateur doit avoir l'un des rôles fournis. */
++export async function requireRole(allowed: readonly Role[]): Promise<Guarded> {
++  const guarded = await requireUser()
++  if (!allowed.includes(guarded.role)) {
++    throw new AuthorizationError('Droit refusé : rôle insuffisant.')
++  }
++  return guarded
++}
++
++/** Réservé à la présidence et à l'administration. */
++export function requireAdmin(): Promise<Guarded> {
++  return requireRole(ADMIN_ROLES)
++}
++
++/** Réservé au bureau / CODIR. */
++export function requireBureau(): Promise<Guarded> {
++  return requireRole(BUREAU_ROLES)
++}
++
++/** Vrai si l'utilisateur courant a le rôle donné (pour filtrer une réponse). */
++export function guardHasRole(guarded: Guarded, allowed: readonly Role[]): boolean {
++  return hasRole(guarded.role, allowed)
++}
+diff --git a/lib/whatsappParser.ts b/lib/whatsappParser.ts
+--- a/lib/whatsappParser.ts
++++ b/lib/whatsappParser.ts
+@@ -21,6 +21,18 @@ export function parseWhatsAppExport(fileContent: string) {
+   const regexWhatsApp = /(?:\[?\d{2}\/\d{2}\/\d{2,4},?\s*\d{2}:\d{2}(?::\d{2})?\]?)\s*(?:[-–]\s*)?([^:]+):\s*(.*)$/
+   const emojiRegex = /[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}]/gu;
+ 
++  // Mot entier, accents et apostrophes compris : évite que « capacité » compte
++  // comme « cité » ou que « apéritif » compte comme « apéro ».
++  const wordPatternCache = new Map<string, RegExp>()
++  function wordPattern(word: string): RegExp {
++    const cached = wordPatternCache.get(word)
++    if (cached) return cached
++    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
++    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu')
++    wordPatternCache.set(word, pattern)
++    return pattern
++  }
++
+   for (const line of lines) {
+     const match = line.match(regexWhatsApp)
+     if (match && match[1] && match[2]) {
+@@ -46,29 +58,34 @@ export function parseWhatsAppExport(fileContent: string) {
+       userMessageCount[author] = (userMessageCount[author] || 0) + 1
+ 
+       // 2. Comptage "Apéro" et variantes
+-      if (content.includes('apéro') || content.includes('apero')) {
++      // Mots entiers seulement : « apéritif » ne doit pas compter comme « apéro »,
++      // sinon les statistiques sont faussées (voir la revue de code).
++      const hasWord = (word: string) => wordPattern(word).test(content)
++
++      if (hasWord('apéro') || hasWord('apero')) {
+         aperoCount++
+         aperoWordCount['apéro / apero']++
+       }
+-      if (content.includes('bière') || content.includes('biere')) {
++      if (hasWord('bière') || hasWord('biere')) {
+         aperoCount++
+         aperoWordCount['bière / biere']++
+       }
+-      if (content.includes('verre') || content.includes('tournée') || content.includes('tournee')) {
++      if (hasWord('verre') || hasWord('tournée') || hasWord('tournee')) {
+         aperoCount++
+         aperoWordCount['verre / tournée']++
+       }
+-      if (content.includes('pinard') || content.includes('vin')) {
++      if (hasWord('pinard') || hasWord('vin')) {
+         aperoCount++
+         aperoWordCount['pinard / vin']++
+       }
+-      if (content.includes('pastis')) {
++      if (hasWord('pastis')) {
+         aperoCount++
+         aperoWordCount['pastis']++
+       }
+ 
+       // 3. Mentions de l'école
+-      if (content.includes('cité') || content.includes('cite') || content.includes('ecole') || content.includes('école')) {
++      // « cité » en mot entier : « capacité », « publicité » ne doivent pas compter.
++      if (hasWord('cité') || hasWord('cite') || hasWord('ecole') || hasWord('école')) {
+         citeCount++
+       }
+ 
+diff --git a/middleware.ts b/middleware.ts
+--- a/middleware.ts
++++ b/middleware.ts
+@@ -23,7 +23,10 @@ export async function middleware(request: NextRequest) {
+             supabaseResponse.cookies.set(name, value, {
+               ...options,
+               sameSite: 'lax',
+-              secure: true,
++              // `secure` en production uniquement : sur http://localhost le
++              // navigateur rejette un cookie `Secure`, la session ne tient pas
++              // et la connexion boucle sur /login en développement.
++              secure: process.env.NODE_ENV === 'production',
+             })
+           )
+         },
+diff --git a/next.config.ts b/next.config.ts
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -1,8 +1,11 @@
+-/** @type {import('Next').NextConfig} */
+-const nextConfig = {
++import type { NextConfig } from "next";
++
++const nextConfig: NextConfig = {
++  // `ignoreBuildErrors: true` masquait la totalité des erreurs de type, dont
++  // celle qui cassait le build (components/TeamForm.tsx). Les erreurs de type
++  // ne sont plus ignorées ; `tsc --noEmit` doit rester vert avant de merger.
+   typescript: {
+-    // Ignore les erreurs de type pendant le build Vercel
+-    ignoreBuildErrors: true,
++    ignoreBuildErrors: false,
+   },
+   images: {
+     remotePatterns: [
+@@ -14,4 +17,4 @@ const nextConfig = {
+   },
+ }
+ 
+-module.exports = nextConfig
+\ No newline at end of file
++export default nextConfig
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,11 @@
+     "dev": "next dev",
+     "build": "next build",
+     "start": "next start",
+-    "lint": "eslint"
++    "lint": "eslint",
++    "test": "node --import ./tests/setup.mjs --test tests/",
++    "test:watch": "node --import ./tests/setup.mjs --test --watch tests/",
++    "check:activation": "node scripts/check-activation.mjs",
++    "typecheck": "tsc --noEmit"
+   },
+   "dependencies": {
+     "@supabase/ssr": "^0.12.7",
+@@ -36,5 +40,8 @@
+     "eslint-config-next": "16.3.6",
+     "tailwindcss": "^4",
+     "typescript": "^5"
++  },
++  "engines": {
++    "node": ">=22.15"
+   }
+ }
+diff --git a/scripts/check-activation.mjs b/scripts/check-activation.mjs
+new file mode 100644
+--- /dev/null
++++ b/scripts/check-activation.mjs
+@@ -0,0 +1,69 @@
++#!/usr/bin/env node
++/**
++ * Vérifie que les secrets d'activation sont présents dans `.env.local`
++ * SANS jamais afficher leur valeur.
++ *
++ *   npm run check:activation
++ *
++ * Une ligne « OK » ou « MANQUANT » par variable, puis un code de sortie 1
++ * s'il en manque une (utilisable dans un script de déploiement).
++ */
++import { readFileSync, existsSync } from 'node:fs'
++import path from 'node:path'
++
++const REQUIRED = [
++  'NEXT_PUBLIC_SUPABASE_URL',
++  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
++  'SUPABASE_SERVICE_ROLE_KEY',
++  'NEXT_PUBLIC_VAPID_PUBLIC_KEY',
++  'VAPID_PRIVATE_KEY',
++  'CRON_SECRET',
++]
++
++const file = path.join(process.cwd(), '.env.local')
++const vars = { ...process.env }
++
++if (existsSync(file)) {
++  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
++    const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line)
++    if (!match) continue
++    const [, name, raw] = match
++    vars[name] = raw.replace(/^['"]|['"]$/g, '').trim()
++  }
++} else {
++  console.log('⚠️  Aucun .env.local trouvé dans ce dossier.')
++}
++
++let missing = 0
++for (const name of REQUIRED) {
++  const value = vars[name]
++  if (value) {
++    console.log(`OK        ${name} (${value.length} caractères)`)
++  } else {
++    console.log(`MANQUANT  ${name}`)
++    missing++
++  }
++}
++
++// Contrôles de forme, sans jamais afficher la valeur
++if (vars.CRON_SECRET && vars.CRON_SECRET.length < 24) {
++  console.log('⚠️  CRON_SECRET fait moins de 24 caractères : utilise `openssl rand -hex 32`.')
++}
++if (vars.VAPID_PRIVATE_KEY && !/^[A-Za-z0-9_-]{40,}$/.test(vars.VAPID_PRIVATE_KEY)) {
++  console.log('⚠️  VAPID_PRIVATE_KEY ne ressemble pas à une clé base64url : recopie-la en entier, sans guillemets.')
++}
++if (
++  vars.NEXT_PUBLIC_SUPABASE_URL &&
++  !/^https:\/\/[a-z0-9]+\.supabase\.co$/.test(vars.NEXT_PUBLIC_SUPABASE_URL)
++) {
++  console.log('⚠️  NEXT_PUBLIC_SUPABASE_URL ne ressemble pas à https://<projet>.supabase.co.')
++}
++if (vars.SUPABASE_SERVICE_ROLE_KEY && vars.SUPABASE_SERVICE_ROLE_KEY.startsWith('NEXT_PUBLIC_')) {
++  console.log('⚠️  La clé service_role ne doit jamais être préfixée NEXT_PUBLIC_.')
++}
++
++if (missing > 0) {
++  console.log(`\n${missing} variable(s) manquante(s). Voir INSTALLATION.md.`)
++  process.exit(1)
++}
++console.log('\nTout est en place : `npm run dev` peut démarrer.')
+diff --git a/supabase/migrations/20260101000000_push_subscriptions_endpoint.sql b/supabase/migrations/20260101000000_push_subscriptions_endpoint.sql
+new file mode 100644
+--- /dev/null
++++ b/supabase/migrations/20260101000000_push_subscriptions_endpoint.sql
+@@ -0,0 +1,62 @@
++-- ---------------------------------------------------------------------------
++-- Push : un abonnement par appareil
++-- ---------------------------------------------------------------------------
++-- Avant : `/api/save-subscription` faisait un upsert sur `user_id`, donc
++-- activer les notifications sur l'ordinateur écrasait l'abonnement du
++-- téléphone (une seule ligne par personne, un seul appareil notifié).
++--
++-- `subscription` (JSONB) reste la source lue par `lib/push.ts` ; la colonne
++-- `endpoint` sert de clé d'unicité et d'index.
++
++alter table public.push_subscriptions
++  add column if not exists endpoint text;
++
++-- Remplit `endpoint` depuis le JSON déjà stocké
++update public.push_subscriptions
++   set endpoint = subscription->>'endpoint'
++ where endpoint is null
++   and subscription ? 'endpoint';
++
++-- Supprime les doublons éventuels avant la contrainte unique
++delete from public.push_subscriptions a
++ using public.push_subscriptions b
++ where a.id > b.id
++   and a.endpoint is not null
++   and a.endpoint = b.endpoint;
++
++create unique index if not exists push_subscriptions_endpoint_key
++  on public.push_subscriptions (endpoint);
++
++create index if not exists push_subscriptions_user_id_idx
++  on public.push_subscriptions (user_id);
++
++-- RLS : chaque personne ne voit et ne modifie que ses propres abonnements.
++alter table public.push_subscriptions enable row level security;
++
++drop policy if exists "push_subscriptions_select_own" on public.push_subscriptions;
++create policy "push_subscriptions_select_own"
++  on public.push_subscriptions for select
++  to authenticated
++  using (user_id = auth.uid());
++
++drop policy if exists "push_subscriptions_insert_own" on public.push_subscriptions;
++create policy "push_subscriptions_insert_own"
++  on public.push_subscriptions for insert
++  to authenticated
++  with check (user_id = auth.uid());
++
++drop policy if exists "push_subscriptions_update_own" on public.push_subscriptions;
++create policy "push_subscriptions_update_own"
++  on public.push_subscriptions for update
++  to authenticated
++  using (user_id = auth.uid())
++  with check (user_id = auth.uid());
++
++drop policy if exists "push_subscriptions_delete_own" on public.push_subscriptions;
++create policy "push_subscriptions_delete_own"
++  on public.push_subscriptions for delete
++  to authenticated
++  using (user_id = auth.uid());
++
++comment on column public.push_subscriptions.endpoint is
++  'Endpoint Web Push de l''appareil ; clé unique. `subscription` contient l''objet complet.';
+diff --git a/tests/actions.test.mjs b/tests/actions.test.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/actions.test.mjs
+@@ -0,0 +1,253 @@
++/**
++ * Tests d'autorisation des Server Actions.
++ *
++ * La règle testée : un membre « parent » (ou sans rôle) ne doit JAMAIS pouvoir
++ * écrire ni notifier. Ces tests tournent sans base de données : le client
++ * Supabase est remplacé par une doublure (voir `tests/setup.mjs`).
++ *
++ * Lancer : `npm test`
++ */
++import { test, beforeEach } from 'node:test'
++import assert from 'node:assert/strict'
++import { resetSupabase, redirigeVers, aEcrit } from './setup.mjs'
++
++const PARENT = { id: 'user-parent', email: 'parent@example.com' }
++const BUREAU = { id: 'user-bureau', email: 'bureau@example.com' }
++
++/** Cible d'erreur commune aux gardes de rôle. */
++const DROIT_REFUSE = /réserv|bureau|autoris|refus/i
++
++const formData = (values) => {
++  const data = new FormData()
++  for (const [key, value] of Object.entries(values)) data.set(key, value)
++  return data
++}
++
++/** Message d'un retour d'action (`{ error }` ou `{ ok: false, error }`). */
++const erreur = (result) => (result && (result.error ?? result.message)) || ''
++
++/** Vrai si l'action a refusé l'opération, sans rien écrire en base. */
++const refus = (result) => Boolean(result && (result.ok === false || result.error)) && aEcrit() === false
++
++beforeEach(() => {
++  // Chaque test fixe son contexte avec `resetSupabase({...})`.
++  resetSupabase({})
++})
++
++// ---------------------------------------------------------------------------
++// 1. updateMembershipStatus — réservé au bureau
++// ---------------------------------------------------------------------------
++test('updateMembershipStatus : un parent ne peut pas valider une adhésion', async () => {
++  resetSupabase({ user: PARENT, tables: { profiles: { row: { role: 'parent' } } } })
++
++  const { updateMembershipStatus } = await import('@/lib/actions/membership.ts')
++  const result = await updateMembershipStatus(
++    formData({ membershipId: 'adh-1', status: 'validated' })
++  )
++
++  assert.ok(refus(result), 'un parent doit être refusé, sans aucune écriture')
++  assert.match(erreur(result), DROIT_REFUSE)
++})
++
++test('updateMembershipStatus : un bureau ne peut pas valider sa propre adhésion', async () => {
++  resetSupabase({
++    user: BUREAU,
++    tables: {
++      profiles: { row: { role: 'tresorier' } },
++      memberships: { row: { id: 'adh-2', user_id: BUREAU.id, status: 'pending' } },
++    },
++  })
++
++  const { updateMembershipStatus } = await import('@/lib/actions/membership.ts')
++  const result = await updateMembershipStatus(
++    formData({ membershipId: 'adh-2', status: 'validated' })
++  )
++
++  assert.equal(aEcrit(), false, 'aucune écriture ne doit être tentée')
++  assert.match(erreur(result), /propre|vous-même|soi/i)
++})
++
++test("updateMembershipStatus : un bureau valide l'adhésion d'un autre membre", async () => {
++  const client = resetSupabase({
++    user: BUREAU,
++    tables: {
++      profiles: { row: { role: 'tresorier' } },
++      memberships: { row: { id: 'adh-3', user_id: 'autre-user', status: 'pending' } },
++    },
++  })
++
++  const { updateMembershipStatus } = await import('@/lib/actions/membership.ts')
++  const result = await updateMembershipStatus(
++    formData({ membershipId: 'adh-3', status: 'validated' })
++  )
++
++  assert.ok(!erreur(result), `pas d'erreur attendue, reçu : ${erreur(result)}`)
++  const ecriture = client.calls.find(
++    (call) => call.table === 'memberships' && call.mode === 'update'
++  )
++  assert.ok(ecriture, 'un update sur memberships est attendu')
++  assert.equal(ecriture.payload.status, 'validated')
++})
++
++test('updateMembershipStatus : un statut inconnu est refusé', async () => {
++  resetSupabase({
++    user: BUREAU,
++    tables: {
++      profiles: { row: { role: 'tresorier' } },
++      memberships: { row: { id: 'adh-4', user_id: 'autre-user' } },
++    },
++  })
++
++  const { updateMembershipStatus } = await import('@/lib/actions/membership.ts')
++  const result = await updateMembershipStatus(formData({ membershipId: 'adh-4', status: 'paye' }))
++
++  assert.equal(aEcrit(), false, 'un statut hors liste ne doit rien écrire')
++  assert.ok(erreur(result))
++})
++
++// ---------------------------------------------------------------------------
++// 2. createProduct — réservé au bureau
++// ---------------------------------------------------------------------------
++test('createProduct : un parent ne peut pas créer un produit', async () => {
++  resetSupabase({ user: PARENT, tables: { profiles: { row: { role: 'parent' } } } })
++
++  const { createProduct } = await import('@/lib/actions/shop.ts')
++  const result = await createProduct(
++    formData({ name: 'T-shirt', price: '12', stock: '10', description: 'Coton' })
++  )
++
++  assert.ok(refus(result), 'un parent doit être refusé, sans aucune écriture')
++  assert.match(erreur(result), DROIT_REFUSE)
++})
++
++test('createProduct : un prix négatif est refusé', async () => {
++  resetSupabase({ user: BUREAU, tables: { profiles: { row: { role: 'bureau' } } } })
++
++  const { createProduct } = await import('@/lib/actions/shop.ts')
++  const result = await createProduct(formData({ name: 'Mug', price: '-3', stock: '5' }))
++
++  assert.equal(aEcrit(), false)
++  assert.ok(erreur(result))
++})
++
++test('createProduct : un bureau crée le produit', async () => {
++  const client = resetSupabase({ user: BUREAU, tables: { profiles: { row: { role: 'bureau' } } } })
++
++  const { createProduct } = await import('@/lib/actions/shop.ts')
++  const result = await createProduct(
++    formData({ name: 'T-shirt', price: '12,50', stock: '10', description: 'Coton bio' })
++  )
++
++  assert.ok(!erreur(result), `pas d'erreur attendue, reçu : ${erreur(result)}`)
++  const ecriture = client.calls.find((call) => call.table === 'products' && call.mode === 'insert')
++  assert.ok(ecriture, 'un insert dans products est attendu')
++  assert.equal(ecriture.payload.price, 12.5, 'le prix « 12,50 » doit être converti en 12.5')
++})
++
++// ---------------------------------------------------------------------------
++// 3. createOrder — le prix vient de la base, jamais du navigateur
++// ---------------------------------------------------------------------------
++test('createOrder : le prix envoyé par le navigateur est ignoré', async () => {
++  const client = resetSupabase({
++    user: PARENT,
++    tables: {
++      profiles: { row: { role: 'parent' } },
++      products: { row: { id: 'prod-1', price: 20, is_closed: false, stock: 5 } },
++    },
++  })
++
++  const { createOrder } = await import('@/lib/actions/shop.ts')
++  const result = await createOrder(
++    formData({ productId: 'prod-1', quantity: '1', price: '0.01', total_price: '0.01' })
++  )
++
++  assert.ok(!erreur(result), `pas d'erreur attendue, reçu : ${erreur(result)}`)
++  const ecriture = client.calls.find((call) => call.table === 'orders' && call.mode === 'insert')
++  assert.ok(ecriture, 'un insert dans orders est attendu')
++  assert.equal(ecriture.payload.total_price, 20, 'le total doit venir du prix en base (20 €)')
++})
++
++test('createOrder : un produit fermé aux commandes est refusé', async () => {
++  resetSupabase({
++    user: PARENT,
++    tables: {
++      profiles: { row: { role: 'parent' } },
++      products: { row: { id: 'prod-2', price: 20, is_closed: true, stock: 5 } },
++    },
++  })
++
++  const { createOrder } = await import('@/lib/actions/shop.ts')
++  const result = await createOrder(formData({ productId: 'prod-2', quantity: '1' }))
++
++  assert.equal(aEcrit(), false, 'aucune commande ne doit être créée')
++  assert.ok(erreur(result))
++})
++
++// ---------------------------------------------------------------------------
++// 4. addTeamMember — réservé au bureau
++// ---------------------------------------------------------------------------
++test("addTeamMember : un parent ne peut pas modifier l'équipe du bureau", async () => {
++  resetSupabase({ user: PARENT, tables: { profiles: { row: { role: 'parent' } } } })
++
++  const { addTeamMember } = await import('@/app/bureau/team/actions.ts')
++  const result = await addTeamMember(
++    formData({ first_name: 'Jean', last_name: 'Dupont', role: 'president' })
++  )
++
++  assert.ok(refus(result), 'un parent doit être refusé')
++  assert.match(erreur(result), DROIT_REFUSE)
++})
++
++test('addTeamMember : une image non autorisée est refusée', async () => {
++  resetSupabase({ user: BUREAU, tables: { profiles: { row: { role: 'bureau' } } } })
++
++  // Un PDF renommé en .jpg reste un PDF : le type MIME prime sur l'extension.
++  const pdf = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46])], 'photo.jpg', {
++    type: 'application/pdf',
++  })
++  const data = formData({ first_name: 'Jean', last_name: 'Dupont', role: 'president' })
++  data.set('photo', pdf)
++
++  const { addTeamMember } = await import('@/app/bureau/team/actions.ts')
++  const result = await addTeamMember(data)
++
++  assert.equal(aEcrit(), false, 'aucun upload ne doit être tenté')
++  assert.ok(erreur(result))
++})
++
++// ---------------------------------------------------------------------------
++// 5. updateUserRole — pas d'auto-verrouillage
++// ---------------------------------------------------------------------------
++test('updateUserRole : un admin ne peut pas retirer son propre rôle', async () => {
++  resetSupabase({ user: BUREAU, tables: { profiles: { row: { role: 'admin' } } } })
++
++  const { updateUserRole } = await import('@/lib/actions/admin.ts')
++  const result = await updateUserRole(formData({ userId: BUREAU.id, role: 'parent' }))
++
++  assert.equal(aEcrit(), false)
++  assert.match(erreur(result), /propre|dernier admin|vous-même/i)
++})
++
++test('updateUserRole : un rôle inconnu est refusé', async () => {
++  resetSupabase({ user: BUREAU, tables: { profiles: { row: { role: 'admin' } } } })
++
++  const { updateUserRole } = await import('@/lib/actions/admin.ts')
++  const result = await updateUserRole(formData({ userId: 'autre-user', role: 'super-admin' }))
++
++  assert.equal(aEcrit(), false)
++  assert.ok(erreur(result))
++})
++
++// ---------------------------------------------------------------------------
++// 6. Redirections : pas de destination externe
++// ---------------------------------------------------------------------------
++test('signIn : une destination externe est remplacée par /dashboard', async () => {
++  resetSupabase({ user: PARENT, tables: { profiles: { row: { role: 'parent' } } } })
++
++  const { signIn } = await import('@/lib/actions/auth.ts')
++  await signIn(
++    formData({ email: 'parent@example.com', password: 'motdepasse', next: 'https://exemple.com' })
++  ).catch(() => {})
++
++  assert.equal(redirigeVers(), '/dashboard')
++})
+diff --git a/tests/create-admin-stub.mjs b/tests/create-admin-stub.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/create-admin-stub.mjs
+@@ -0,0 +1,4 @@
++/** Doublure de `@/lib/supabase/admin`. */
++export function createAdminClient() {
++  return globalThis.__getSupabase()
++}
+diff --git a/tests/create-client-stub.mjs b/tests/create-client-stub.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/create-client-stub.mjs
+@@ -0,0 +1,4 @@
++/** Doublure de `@/lib/supabase/server` et `@/lib/supabase/client`. */
++export async function createClient() {
++  return globalThis.__getSupabase()
++}
+diff --git a/tests/next-cache-stub.mjs b/tests/next-cache-stub.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/next-cache-stub.mjs
+@@ -0,0 +1,10 @@
++/** Doublure de `next/cache` : trace les invalidations sans effet. */
++globalThis.__revalidated ??= []
++
++export function revalidatePath(path) {
++  globalThis.__revalidated.push(path)
++}
++
++export function revalidateTag(tag) {
++  globalThis.__revalidated.push(tag)
++}
+diff --git a/tests/next-headers-stub.mjs b/tests/next-headers-stub.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/next-headers-stub.mjs
+@@ -0,0 +1,13 @@
++/** Doublure de `next/headers` : un magasin de cookies en mémoire. */
++export async function cookies() {
++  return {
++    getAll: () => [],
++    get: () => undefined,
++    set: () => {},
++    delete: () => {},
++  }
++}
++
++export async function headers() {
++  return new Headers()
++}
+diff --git a/tests/next-navigation-stub.mjs b/tests/next-navigation-stub.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/next-navigation-stub.mjs
+@@ -0,0 +1,29 @@
++/**
++ * Doublure de `next/navigation` : enregistre la redirection au lieu de la
++ * lancer (une vraie `redirect()` ne fonctionne que dans une requête Next).
++ * Les tests lisent la cible avec `redirigeVers()`.
++ */
++export function redirect(url) {
++  globalThis.__lastRedirect = String(url)
++  const error = new Error(`NEXT_REDIRECT:${url}`)
++  error.digest = `NEXT_REDIRECT;replace;${url};307;`
++  throw error
++}
++
++export function notFound() {
++  const error = new Error('NEXT_NOT_FOUND')
++  error.digest = 'NEXT_NOT_FOUND'
++  throw error
++}
++
++export function usePathname() {
++  return '/'
++}
++
++export function useSearchParams() {
++  return new URLSearchParams()
++}
++
++export function useRouter() {
++  return { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {} }
++}
+diff --git a/tests/setup-server-only.mjs b/tests/setup-server-only.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/setup-server-only.mjs
+@@ -0,0 +1,5 @@
++/**
++ * `server-only` lève une erreur hors bundler Next. Le module est remplacé par
++ * ce fichier vide via `registerHooks` (voir tests/setup.mjs).
++ */
++export {}
+diff --git a/tests/setup.mjs b/tests/setup.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/setup.mjs
+@@ -0,0 +1,201 @@
++/**
++ * Préchargé par `node --import` (voir package.json → "test").
++ *
++ * Fournit :
++ *  - des variables d'environnement factices pour Supabase ;
++ *  - un faux client Supabase pour les Server Actions, piloté par chaque test ;
++ *  - `redirigeVers()`, qui lit la redirection captée au lieu de l'exécuter.
++ *
++ * Aucune requête réseau : `@supabase/supabase-js` n'est jamais instancié, les
++ * modules `@/lib/supabase/*`, `next/headers`, `next/cache`, `next/navigation`
++ * et `server-only` sont remplacés par des doublures (voir `registerHooks`).
++ */
++import { registerHooks } from 'node:module'
++import { existsSync } from 'node:fs'
++import path from 'node:path'
++import { fileURLToPath } from 'node:url'
++
++process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'http://localhost:54321'
++process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= 'cle-anon-de-test'
++process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'cle-service-de-test'
++
++const projectRoot = process.env.PROJECT_ROOT ?? process.cwd()
++const stubs = new URL('./', import.meta.url)
++const stub = (name) => new URL(name, stubs).href
++
++// ---------------------------------------------------------------------------
++// Faux client Supabase
++// ---------------------------------------------------------------------------
++function createFakeSupabase(config = {}) {
++  const {
++    tables = {},
++    user = { id: 'user-1', email: 'parent@example.com' },
++    uploadError = null,
++    authErrors = {},
++  } = config
++  const calls = []
++
++  function from(table) {
++    const cfg = tables[table] ?? {}
++    const state = { table, mode: 'select', filters: [], payload: null, options: null }
++
++    const settle = () => {
++      calls.push({ ...state })
++      if (cfg.error) return { data: null, error: cfg.error }
++      if (state.mode === 'select') {
++        const value = cfg.data ?? cfg.row ?? null
++        return { data: Array.isArray(value) ? value : value ? [value] : [], error: null }
++      }
++      return { data: null, error: null }
++    }
++
++    const builder = {
++      select: () => builder,
++      eq(column, value) {
++        state.filters.push({ column, value })
++        return builder
++      },
++      in(column, value) {
++        state.filters.push({ column, value })
++        return builder
++      },
++      order: () => builder,
++      limit: () => builder,
++      insert(payload) {
++        state.mode = 'insert'
++        state.payload = payload
++        return builder
++      },
++      update(payload) {
++        state.mode = 'update'
++        state.payload = payload
++        return builder
++      },
++      upsert(payload, options) {
++        state.mode = 'upsert'
++        state.payload = payload
++        state.options = options
++        return builder
++      },
++      delete() {
++        state.mode = 'delete'
++        return builder
++      },
++      single() {
++        calls.push({ ...state })
++        if (cfg.error) return Promise.resolve({ data: null, error: cfg.error })
++        return Promise.resolve({ data: cfg.row ?? null, error: null })
++      },
++      maybeSingle() {
++        return builder.single()
++      },
++      then(resolve, reject) {
++        return Promise.resolve(settle()).then(resolve, reject)
++      },
++    }
++    return builder
++  }
++
++  return {
++    calls,
++    auth: {
++      getUser: async () => ({ data: { user }, error: user ? null : { message: 'Pas de session' } }),
++      signInWithPassword: async () => ({ data: {}, error: authErrors.signInWithPassword ?? null }),
++      signUp: async () => ({ data: {}, error: authErrors.signUp ?? null }),
++      signOut: async () => ({ error: null }),
++      exchangeCodeForSession: async () => ({ error: authErrors.exchangeCodeForSession ?? null }),
++    },
++    from,
++    storage: {
++      from: () => ({
++        upload: async () => ({ error: uploadError }),
++        getPublicUrl: () => ({ data: { publicUrl: 'https://exemple.supabase.co/fichier.jpg' } }),
++      }),
++    },
++  }
++}
++
++globalThis.__fakeSupabase = null
++
++globalThis.__setSupabase = (config) => {
++  globalThis.__fakeSupabase = createFakeSupabase(config)
++  return globalThis.__fakeSupabase
++}
++
++globalThis.__getSupabase = () => {
++  if (!globalThis.__fakeSupabase) globalThis.__setSupabase({})
++  return globalThis.__fakeSupabase
++}
++
++// ---------------------------------------------------------------------------
++// Résolution des modules
++// ---------------------------------------------------------------------------
++const ALIASES = {
++  'server-only': 'setup-server-only.mjs',
++  '@supabase/supabase-js': 'supabase-stub.mjs',
++  'next/headers': 'next-headers-stub.mjs',
++  'next/cache': 'next-cache-stub.mjs',
++  'next/navigation': 'next-navigation-stub.mjs',
++  '@/lib/supabase/server': 'create-client-stub.mjs',
++  '@/lib/supabase/client': 'create-client-stub.mjs',
++  '@/lib/supabase/admin': 'create-admin-stub.mjs',
++}
++
++const EXTENSIONS = ['.ts', '.tsx', '.mts', '/index.ts', '.mjs', '.js']
++
++registerHooks({
++  resolve(specifier, context, nextResolve) {
++    const alias = ALIASES[specifier]
++    if (alias) return { url: stub(alias), shortCircuit: true }
++
++    // Alias `@/…` du projet
++    if (specifier.startsWith('@/')) {
++      for (const candidate of resolveCandidate(path.join(projectRoot, specifier.slice(2)))) {
++        if (existsSync(candidate)) {
++          return { url: new URL('file://' + candidate.replace(/\\/g, '/')).href, shortCircuit: true }
++        }
++      }
++    }
++
++    // Import relatif sans extension (`./_guards`, `../lib/x`) : TypeScript
++    // l'accepte, Node non. On ajoute l'extension à la volée.
++    if (specifier.startsWith('.') && !/\.(m?js|cjs|json|ts|tsx)$/.test(specifier)) {
++      const parent = context.parentURL ? fileURLToPath(context.parentURL) : path.join(projectRoot, 'index.js')
++      for (const candidate of resolveCandidate(path.resolve(path.dirname(parent), specifier))) {
++        if (existsSync(candidate)) {
++          return { url: new URL('file://' + candidate.replace(/\\/g, '/')).href, shortCircuit: true }
++        }
++      }
++    }
++
++    return nextResolve(specifier, context)
++  },
++})
++
++function resolveCandidate(base) {
++  return [base, ...EXTENSIONS.map((ext) => base + ext)]
++}
++
++// ---------------------------------------------------------------------------
++// Aides exportées aux tests
++// ---------------------------------------------------------------------------
++/** Réinitialise le faux client (et la redirection captée) ; renvoie le client. */
++export function resetSupabase(config = {}) {
++  globalThis.__lastRedirect = null
++  return globalThis.__setSupabase(config)
++}
++
++/** Cible de la redirection demandée par le code sous test, ou `null`. */
++export function redirigeVers() {
++  return globalThis.__lastRedirect ?? null
++}
++
++/** Tous les appels Supabase enregistrés (lecture et écriture). */
++export function appelsSupabase() {
++  return globalThis.__getSupabase().calls
++}
++
++/** Vrai si une écriture (insert/update/upsert/delete) a été tentée. */
++export function aEcrit() {
++  return appelsSupabase().some((call) => call.mode !== 'select')
++}
+diff --git a/tests/supabase-stub.mjs b/tests/supabase-stub.mjs
+new file mode 100644
+--- /dev/null
++++ b/tests/supabase-stub.mjs
+@@ -0,0 +1,11 @@
++/**
++ * Doublure de `@supabase/supabase-js` : renvoie le faux client de `setup.mjs`.
++ */
++function getClient() {
++  return globalThis.__getSupabase()
++}
++
++export const createClient = () => getClient()
++export const createServerClient = () => getClient()
++export const createBrowserClient = () => getClient()
++export default { createClient, createServerClient, createBrowserClient }
+diff --git a/types/roles.ts b/types/roles.ts
+--- a/types/roles.ts
++++ b/types/roles.ts
+@@ -1,30 +1,69 @@
+-export type Json =
+-  | string
+-  | number
+-  | boolean
+-  | null
+-  | { [key: string]: Json | undefined }
+-  | Json[]
++/**
++ * Source unique des rôles de l'application.
++ *
++ * Avant, ce fichier contenait une copie de `types/database.ts` (donc ni
++ * `Role` ni `ADMIN_ROLES`), ce qui cassait `lib/auth.ts`. Les rôles sont
++ * désormais centralisés ici pour que les écrans et les actions serveur
++ * comparent la même liste.
++ */
+ 
+-export interface Database {
+-  public: {
+-    Tables: {
+-      [key: string]: {
+-        Row: Record<string, any>
+-        Insert: Record<string, any>
+-        Update: Record<string, any>
+-      }
+-    }
+-    Views: {
+-      [key: string]: {
+-        Row: Record<string, any>
+-      }
+-    }
+-    Functions: {
+-      [key: string]: unknown
+-    }
+-    Enums: {
+-      [key: string]: unknown
+-    }
+-  }
+-}
+\ No newline at end of file
++/** Tous les rôles connus (utilisé par `normalizeRole`). */
++export const ALL_ROLES = [
++  "parent",
++  "membre_codir",
++  "bureau",
++  "president",
++  "vice_president",
++  "secretaire",
++  "vice_secretaire",
++  "tresorier",
++  "vice_tresorier",
++  "admin",
++] as const satisfies readonly Role[];
++
++export type Role =
++  | "parent"
++  | "membre_codir"
++  | "bureau"
++  | "president"
++  | "vice_president"
++  | "secretaire"
++  | "vice_secretaire"
++  | "tresorier"
++  | "vice_tresorier"
++  | "admin";
++
++/** Rôles autorisés à accéder aux pages et actions d'administration. */
++export const ADMIN_ROLES: Role[] = ["president", "admin"];
++
++/** Rôles du bureau / CODIR : accès aux outils de gestion (stocks, finances, bureau). */
++export const BUREAU_ROLES: Role[] = [
++  "admin",
++  "president",
++  "vice_president",
++  "secretaire",
++  "vice_secretaire",
++  "tresorier",
++  "vice_tresorier",
++  "bureau",
++  "membre_codir",
++];
++
++/** Rôles pouvant envoyer une notification push à toute l'association. */
++export const PUSH_SENDER_ROLES: Role[] = ["admin", "tresorier", "secretaire"];
++
++/** Normalise un rôle venant de la base (casse, espaces, valeur inattendue). */
++export function normalizeRole(value: unknown): Role | null {
++  if (typeof value !== "string") return null;
++  const cleaned = value.trim().toLowerCase();
++  return (ALL_ROLES as readonly string[]).includes(cleaned) ? (cleaned as Role) : null;
++}
++
++/** Vrai si le rôle fait partie de la liste (comparaison insensible à la casse). */
++export function hasRole(
++  role: string | null | undefined,
++  allowed: readonly Role[]
++): boolean {
++  const normalized = normalizeRole(role);
++  return normalized !== null && allowed.includes(normalized);
++}

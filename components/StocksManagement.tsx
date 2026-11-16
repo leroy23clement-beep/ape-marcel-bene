@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { Fragment, useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Html5Qrcode } from 'html5-qrcode'
 
@@ -50,8 +50,14 @@ export default function StocksManagement() {
 
   useEffect(() => {
     loadInventory()
+    // `stopScanner` est défini plus bas : l'utiliser ici lirait la constante
+    // avant son initialisation (TDZ). On arrête le scanner via la ref.
     return () => {
-      stopScanner()
+      const scanner = scannerRef.current
+      scannerRef.current = null
+      if (scanner) {
+        scanner.stop().then(() => scanner.clear()).catch(() => {})
+      }
     }
   }, [])
 
@@ -82,6 +88,14 @@ export default function StocksManagement() {
     const uPrice = parseFloat(unitPrice)
     const totalCost = qty * uPrice
 
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(uPrice) || uPrice < 0) {
+      alert('Quantité ou prix unitaire invalide.')
+      return
+    }
+
+    const item = items.find((i) => i.id === selectedItemId)
+    if (!item) return
+
     const { error } = await supabase.from('inventory_purchases').insert({
       item_id: selectedItemId,
       quantity: qty,
@@ -90,14 +104,27 @@ export default function StocksManagement() {
       expiration_date: expirationDate || null
     })
 
-    if (!error) {
-      setSelectedItemId('')
-      setQuantity('')
-      setUnitPrice('')
-      setSupplier('')
-      setExpirationDate('')
-      loadInventory()
+    if (error) {
+      alert("Erreur lors de l'enregistrement de l'achat : " + error.message)
+      return
     }
+
+    // Avant, le stock global n'était jamais mis à jour : il restait à 0.
+    const { error: stockError } = await supabase
+      .from('inventory_items')
+      .update({ current_stock: (Number(item.current_stock) || 0) + qty })
+      .eq('id', selectedItemId)
+
+    if (stockError) {
+      console.error('Erreur mise à jour du stock :', stockError)
+    }
+
+    setSelectedItemId('')
+    setQuantity('')
+    setUnitPrice('')
+    setSupplier('')
+    setExpirationDate('')
+    loadInventory()
   }
 
   // Mettre à jour le code-barres d'un article existant
@@ -161,7 +188,11 @@ export default function StocksManagement() {
     setEditingBarcodeId(null)
   }
 
-  const calculatedTotal = (quantity && unitPrice) ? (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2) : '0.00'
+  // Avant : `parseFloat(quantity)` seul, donc un total à « 0.00 ».
+  const calculatedTotal =
+    quantity && unitPrice && !Number.isNaN(Number(quantity)) && !Number.isNaN(Number(unitPrice))
+      ? (Number(quantity) * Number(unitPrice)).toFixed(2)
+      : '0.00'
 
   if (loading) {
     return <div className="text-center py-12 text-gray-500 text-sm">Chargement de la réserve...</div>
@@ -378,7 +409,9 @@ export default function StocksManagement() {
                   const isExpanded = expandedItemId === item.id
 
                   return (
-                    <tr key={item.id} className="contents">
+                    // Un <tr> ne peut pas en contenir d'autres : React signalait
+                    // une erreur d'hydratation à chaque ligne du tableau.
+                    <Fragment key={item.id}>
                       <tr 
                         className={`hover:bg-gray-50 cursor-pointer transition ${isExpanded ? 'bg-purple-50/50' : ''}`}
                         onClick={() => toggleExpand(item.id)}
@@ -514,7 +547,7 @@ export default function StocksManagement() {
                           </td>
                         </tr>
                       )}
-                    </tr>
+                    </Fragment>
                   )
                 })
               )}

@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -23,7 +23,10 @@ export async function middleware(request: NextRequest) {
             supabaseResponse.cookies.set(name, value, {
               ...options,
               sameSite: 'lax',
-              secure: true,
+              // `secure` en production uniquement : sur http://localhost le
+              // navigateur rejette un cookie `Secure`, la session ne tient pas
+              // et la connexion boucle sur /login en développement.
+              secure: process.env.NODE_ENV === 'production',
             })
           )
         },

@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import SendNotificationForm from '@/components/SendNotificationForm'
 import PushNotificationTester from '@/components/PushNotificationTester'
+import { BUREAU_ROLES, PUSH_SENDER_ROLES, hasRole } from '@/types/roles'
 
 export default function BureauPage() {
   const supabase = createClient()
@@ -84,12 +85,11 @@ export default function BureauPage() {
   if (loading) return null
   if (!user) return null
 
-  const allowedBureauRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau']
-  const userRole = profile?.role ? profile.role.toLowerCase() : 'parent'
-  const isBureau = allowedBureauRoles.includes(userRole)
-
-  const notificationAllowedRoles = ['admin', 'tresorier', 'secretaire']
-  const canSendNotifications = notificationAllowedRoles.includes(userRole)
+  // Listes centralisées dans `types/roles.ts` : un « vice_trésorier » ou un
+  // « membre_codir » n'ouvrait pas l'espace bureau alors qu'il existe dans
+  // /admin, et un rôle vide était traité comme « parent » sans être refusé.
+  const isBureau = hasRole(profile?.role, BUREAU_ROLES)
+  const canSendNotifications = hasRole(profile?.role, PUSH_SENDER_ROLES)
 
   const bavardsList = whatsappStats?.topBavardsList || []
   const emojiList = whatsappStats?.topEmojiUsersList || []
@@ -97,7 +97,7 @@ export default function BureauPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
 
       <main className="mx-auto max-w-4xl p-6 space-y-6">
         <header className="border-b pb-4">

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import { BUREAU_ROLES, hasRole } from '@/types/roles';
 
 export default function EcolePage() {
   const [user, setUser] = useState<any>(null);
@@ -57,7 +58,7 @@ export default function EcolePage() {
     setLoading(false);
   }
 
-  const isAdminOrBureau = profile?.role && profile.role !== 'parent';
+  const isAdminOrBureau = hasRole(profile?.role, BUREAU_ROLES);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -105,7 +106,7 @@ export default function EcolePage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       <Navbar 
-        userEmail={user?.email} 
+        userEmail={user?.email ?? ""}
         firstName={profile?.first_name} 
         role={profile?.role} 
       />

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useParams, useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
+import { BUREAU_ROLES, hasRole } from '@/types/roles'
 
 export default function GalleryDetailPage() {
   const params = useParams()
@@ -49,7 +50,8 @@ export default function GalleryDetailPage() {
     loadData()
   }, [galleryId])
 
-  const isAdminOrBureau = profile?.role && profile.role !== 'parent'
+  // Liste explicite : un rôle vide ou inconnu n'ouvre pas les outils du bureau.
+  const isAdminOrBureau = hasRole(profile?.role, BUREAU_ROLES)
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return
@@ -100,7 +102,7 @@ export default function GalleryDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
-      <Navbar userEmail={user?.email} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user?.email ?? ''} firstName={profile?.first_name} role={profile?.role} />
 
       <div className="mx-auto max-w-6xl p-6 space-y-6">
         <div className="flex items-center justify-between border-b pb-4">

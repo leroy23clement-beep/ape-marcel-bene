@@ -69,7 +69,7 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       <Navbar 
-        userEmail={user.email} 
+        userEmail={user.email ?? ""}
         firstName={profile?.first_name} 
         role={profile?.role} 
       />

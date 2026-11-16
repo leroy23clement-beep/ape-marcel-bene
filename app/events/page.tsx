@@ -62,7 +62,7 @@ export default function EventsPage() {
     <div className="min-h-screen bg-gray-50 pb-12">
       {user && (
         <Navbar 
-          userEmail={user.email} 
+          userEmail={user.email ?? ""}
           firstName={profile?.first_name} 
           role={profile?.role} 
         />

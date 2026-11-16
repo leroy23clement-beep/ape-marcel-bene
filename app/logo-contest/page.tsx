@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import { BUREAU_ROLES, hasRole } from '@/types/roles'
 
 export default function LogoContestPage() {
   const supabase = createClient()
@@ -67,11 +68,11 @@ export default function LogoContestPage() {
     }
   }
 
-  const isBureau = profile?.role && profile.role !== 'parent'
+  const isBureau = hasRole(profile?.role, BUREAU_ROLES)
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar userEmail={user?.email} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user?.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
 
       <main className="mx-auto max-w-3xl p-6 space-y-8">
         {/* En-tête et Règlement */}

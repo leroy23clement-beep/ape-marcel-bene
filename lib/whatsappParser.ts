@@ -21,6 +21,18 @@ export function parseWhatsAppExport(fileContent: string) {
   const regexWhatsApp = /(?:\[?\d{2}\/\d{2}\/\d{2,4},?\s*\d{2}:\d{2}(?::\d{2})?\]?)\s*(?:[-–]\s*)?([^:]+):\s*(.*)$/
   const emojiRegex = /[\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{2600}-\u{26FF}]/gu;
 
+  // Mot entier, accents et apostrophes compris : évite que « capacité » compte
+  // comme « cité » ou que « apéritif » compte comme « apéro ».
+  const wordPatternCache = new Map<string, RegExp>()
+  function wordPattern(word: string): RegExp {
+    const cached = wordPatternCache.get(word)
+    if (cached) return cached
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu')
+    wordPatternCache.set(word, pattern)
+    return pattern
+  }
+
   for (const line of lines) {
     const match = line.match(regexWhatsApp)
     if (match && match[1] && match[2]) {
@@ -46,29 +58,34 @@ export function parseWhatsAppExport(fileContent: string) {
       userMessageCount[author] = (userMessageCount[author] || 0) + 1
 
       // 2. Comptage "Apéro" et variantes
-      if (content.includes('apéro') || content.includes('apero')) {
+      // Mots entiers seulement : « apéritif » ne doit pas compter comme « apéro »,
+      // sinon les statistiques sont faussées (voir la revue de code).
+      const hasWord = (word: string) => wordPattern(word).test(content)
+
+      if (hasWord('apéro') || hasWord('apero')) {
         aperoCount++
         aperoWordCount['apéro / apero']++
       }
-      if (content.includes('bière') || content.includes('biere')) {
+      if (hasWord('bière') || hasWord('biere')) {
         aperoCount++
         aperoWordCount['bière / biere']++
       }
-      if (content.includes('verre') || content.includes('tournée') || content.includes('tournee')) {
+      if (hasWord('verre') || hasWord('tournée') || hasWord('tournee')) {
         aperoCount++
         aperoWordCount['verre / tournée']++
       }
-      if (content.includes('pinard') || content.includes('vin')) {
+      if (hasWord('pinard') || hasWord('vin')) {
         aperoCount++
         aperoWordCount['pinard / vin']++
       }
-      if (content.includes('pastis')) {
+      if (hasWord('pastis')) {
         aperoCount++
         aperoWordCount['pastis']++
       }
 
       // 3. Mentions de l'école
-      if (content.includes('cité') || content.includes('cite') || content.includes('ecole') || content.includes('école')) {
+      // « cité » en mot entier : « capacité », « publicité » ne doivent pas compter.
+      if (hasWord('cité') || hasWord('cite') || hasWord('ecole') || hasWord('école')) {
         citeCount++
       }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
+import { BUREAU_ROLES, hasRole } from '@/types/roles'
 
 export default function GalleryIndexPage() {
   const [user, setUser] = useState<any>(null)
@@ -34,7 +35,8 @@ export default function GalleryIndexPage() {
     loadData()
   }, [])
 
-  const isAdminOrBureau = profile?.role && profile.role !== 'parent'
+  // Liste explicite : un rôle vide ou inconnu n'ouvre pas les outils du bureau.
+  const isAdminOrBureau = hasRole(profile?.role, BUREAU_ROLES)
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-500">Chargement des galeries...</div>
@@ -42,7 +44,7 @@ export default function GalleryIndexPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
-      <Navbar userEmail={user?.email} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user?.email ?? ''} firstName={profile?.first_name} role={profile?.role} />
 
       <div className="mx-auto max-w-6xl p-6 space-y-6">
         <header className="border-b pb-4 flex justify-between items-center">

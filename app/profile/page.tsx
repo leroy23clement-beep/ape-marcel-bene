@@ -163,7 +163,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar userEmail={user.email} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user.email ?? ""} firstName={profile?.first_name} role={profile?.role} />
 
       <main className="mx-auto max-w-4xl p-6 space-y-8">
         <header className="border-b pb-4">
