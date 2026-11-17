@@ -24,9 +24,9 @@ export default async function QuiSommesNous() {
       <div>
         {/* Barre de navigation rétablie en haut */}
         <Navbar 
-          userEmail={user?.email} 
-          firstName={profile?.first_name} 
-          role={profile?.role} 
+          userEmail={user?.email ?? ""} 
+          firstName={profile?.first_name ?? undefined} 
+          role={profile?.role ?? undefined} 
         />
 
         <main className="max-w-4xl mx-auto px-4 py-12">

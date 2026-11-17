@@ -28,9 +28,9 @@ export default async function BureauTresoreriePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar 
-        userEmail={user.email} 
-        firstName={profile?.first_name} 
-        role={profile?.role} 
+        userEmail={user.email ?? ""} 
+        firstName={profile?.first_name ?? undefined} 
+        role={profile?.role ?? undefined} 
       />
       <main className="py-6">
         <TreasuryManagement />

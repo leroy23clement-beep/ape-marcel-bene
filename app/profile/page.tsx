@@ -72,10 +72,10 @@ export default function ProfilePage() {
     const formData = new FormData(e.currentTarget)
 
     const updates = {
-      first_name: formData.get('first_name'),
-      last_name: formData.get('last_name'),
-      phone: formData.get('phone'),
-      updated_at: new Date(),
+      first_name: formData.get('first_name') as string,
+      last_name: formData.get('last_name') as string,
+      phone: formData.get('phone') as string,
+      updated_at: new Date().toISOString(),
     }
 
     const { error } = await supabase
@@ -100,10 +100,10 @@ export default function ProfilePage() {
     }
 
     const { error } = await supabase.from('children').insert({
-      household_id: profile.household_id,
+      household_id: profile.household_id as string,
       first_name: newFirstName,
       last_name: newLastName,
-      class_level: newClassLevel || null,
+      class_name: newClassLevel || "",
     })
 
     if (error) {
@@ -121,7 +121,7 @@ export default function ProfilePage() {
     setEditingChildId(child.id)
     setEditFirstName(child.first_name)
     setEditLastName(child.last_name)
-    setEditClassLevel(child.class_level || '')
+    setEditClassLevel(child.class_name || '')
   }
 
   // Enregistrer les modifications d'un enfant
@@ -131,7 +131,7 @@ export default function ProfilePage() {
       .update({
         first_name: editFirstName,
         last_name: editLastName,
-        class_level: editClassLevel || null,
+        class_name: editClassLevel || "",
       })
       .eq('id', childId)
 
@@ -293,8 +293,8 @@ export default function ProfilePage() {
                     <>
                       <div>
                         <p className="font-medium text-sm text-gray-900">{child.first_name} {child.last_name}</p>
-                        {child.class_level && (
-                          <p className="text-xs text-gray-500">Classe : {child.class_level}</p>
+                        {child.class_name && (
+                          <p className="text-xs text-gray-500">Classe : {child.class_name}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-2">

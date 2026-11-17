@@ -8,7 +8,7 @@ import { BUREAU_ROLES, hasRole } from '@/types/roles'
 
 export default function GalleryDetailPage() {
   const params = useParams()
-  const galleryId = params.id
+  const galleryId = String(params.id ?? "")
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [gallery, setGallery] = useState<any>(null)

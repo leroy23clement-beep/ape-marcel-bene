@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { Json } from '@/types/database'
 
 export default function PushNotificationTester() {
   const [loading, setLoading] = useState(false)
@@ -50,9 +51,9 @@ export default function PushNotificationTester() {
           if (!currentUser) throw new Error("Utilisateur non connecté.")
 
           const { error: resaveError } = await supabase.from('push_subscriptions').upsert({
-            user_id: currentUser.id,
+            user_id: currentUser.id as string,
             device_endpoint: existing.endpoint,
-            subscription: existing.toJSON(),
+            subscription: existing.toJSON() as unknown as Json,
           }, { onConflict: 'device_endpoint' })
 
           if (resaveError) throw resaveError
@@ -79,9 +80,9 @@ export default function PushNotificationTester() {
       // Une ligne par appareil : `device_endpoint` (colonne écrite par le code).
       // `endpoint` est générée par la base, donc en lecture seule.
       const { error } = await supabase.from('push_subscriptions').upsert({
-        user_id: user.id,
+        user_id: user.id as string,
         device_endpoint: subscription.endpoint,
-        subscription: subJson,
+        subscription: subJson as unknown as Json,
       }, { onConflict: 'device_endpoint' })
 
       if (error) throw error

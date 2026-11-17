@@ -37,7 +37,7 @@ export default function ManageCalendarPage() {
           .single();
 
         const allowedRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau'];
-        if (!profileData || !allowedRoles.includes(profileData.role?.toLowerCase())) {
+        if (!profileData || !allowedRoles.includes(profileData.role?.toLowerCase() ?? "")) {
           router.push('/dashboard');
           return;
         }
@@ -82,8 +82,8 @@ export default function ManageCalendarPage() {
       const { error: insertError } = await supabase.from('bureau_calendar').insert({
         title,
         event_date: eventDate,
-        location: location || null,
-        description: description || '', // Si vide, envoie une chaîne vide pour éviter l'erreur NOT NULL
+        location: location || undefined,
+        description: description || '',
       });
 
       if (insertError) {

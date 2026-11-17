@@ -32,7 +32,7 @@ export default function BureauTasksOverviewPage() {
           .single();
 
         const allowedRoles = ['admin', 'president', 'secretaire', 'tresorier', 'bureau'];
-        if (!profileData || !allowedRoles.includes(profileData.role?.toLowerCase())) {
+        if (!profileData || !allowedRoles.includes(profileData.role?.toLowerCase() ?? "")) {
           router.push('/dashboard');
           return;
         }

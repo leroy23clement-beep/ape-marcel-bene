@@ -70,8 +70,8 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gray-50 pb-12">
       <Navbar 
         userEmail={user.email ?? ""}
-        firstName={profile?.first_name} 
-        role={profile?.role} 
+        firstName={profile?.first_name ?? undefined} 
+        role={profile?.role ?? undefined} 
       />
 
       <div className="mx-auto max-w-7xl p-6 flex flex-col space-y-6">

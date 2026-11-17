@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import type { Json } from '@/types/database'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import SendNotificationForm from '@/components/SendNotificationForm'
@@ -58,9 +59,9 @@ export default function BureauPage() {
         // …_push_subscriptions_device_endpoint.sql). On n'écrit pas `endpoint`,
         // qui est une colonne générée donc en lecture seule.
         const { error: pushError } = await supabase.from('push_subscriptions').upsert({
-          user_id: currentUser.id,
+          user_id: currentUser.id as string,
           device_endpoint: subscription.endpoint,
-          subscription: subJson,
+          subscription: subJson as unknown as Json,
         }, { onConflict: 'device_endpoint' })
 
         if (pushError) {

@@ -59,9 +59,9 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Barre de navigation */}
       <Navbar 
-        userEmail={user.email} 
-        firstName={profile?.first_name} 
-        role={profile?.role} 
+        userEmail={user.email ?? ""} 
+        firstName={profile?.first_name ?? undefined} 
+        role={profile?.role ?? undefined} 
       />
 
       <div className="mx-auto max-w-4xl p-6 flex flex-col space-y-6">

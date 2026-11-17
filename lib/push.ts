@@ -108,7 +108,7 @@ export async function getStaffUser() {
     .eq('id', user.id)
     .single()
 
-  if (!profile || !PUSH_SENDER_ROLES.includes(profile.role)) return null
+  if (!profile?.role || !PUSH_SENDER_ROLES.includes(profile.role)) return null
   return user
 }
 

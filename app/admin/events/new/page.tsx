@@ -27,7 +27,7 @@ function EventFormContent() {
   const eventId = searchParams.get('id') ?? ''
 
   const [user, setUser] = useState<{ email?: string } | null>(null)
-  const [profile, setProfile] = useState<{ first_name?: string; role?: string } | null>(null)
+  const [profile, setProfile] = useState<{ first_name?: string | null; role?: string | null } | null>(null)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
 
@@ -171,7 +171,7 @@ function EventFormContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar userEmail={user?.email ?? ''} firstName={profile?.first_name} role={profile?.role} />
+      <Navbar userEmail={user?.email ?? ''} firstName={profile?.first_name ?? undefined} role={profile?.role ?? undefined} />
 
       <main className="mx-auto max-w-3xl p-6 space-y-6">
         <div className="flex justify-between items-center border-b pb-4">

@@ -27,8 +27,8 @@ export default async function TeamPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar 
         userEmail={user?.email || ""} 
-        firstName={profile?.first_name} 
-        role={profile?.role} 
+        firstName={profile?.first_name ?? undefined} 
+        role={profile?.role ?? undefined} 
       />
 
       <main className="mx-auto max-w-5xl p-6 space-y-8">

@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function addChild(formData: FormData) {
+export async function addChild(formData: FormData): Promise<void> {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -30,9 +30,8 @@ export async function addChild(formData: FormData) {
 
   if (error) {
     console.error('Erreur lors de l\'ajout de l\'enfant:', error)
-    return { error: 'Impossible d\'ajouter l\'enfant' }
+    return
   }
 
   revalidatePath('/dashboard')
-  return { success: true }
 }
