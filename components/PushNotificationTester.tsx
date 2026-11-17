@@ -31,9 +31,42 @@ export default function PushNotificationTester() {
         throw new Error("Clé VAPID publique introuvable.")
       }
 
+      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey)
+
+      // Si l'appareil est déjà abonné avec une AUTRE clé VAPID (clé régénérée),
+      // le navigateur refuse d'en créer une nouvelle et lève :
+      //   "A subscription with a different applicationServerKey already exists"
+      // On supprime donc l'ancien abonnement avant de réabonner.
+      const existing = await registration.pushManager.getSubscription()
+      if (existing) {
+        const previous = new Uint8Array(existing.options.applicationServerKey ?? [])
+        const sameKey =
+          previous.length === applicationServerKey.length &&
+          previous.every((byte, index) => byte === applicationServerKey[index])
+
+        if (sameKey) {
+          // Déjà abonné avec la bonne clé : on réenregistre simplement en base.
+          const { data: { user: currentUser } } = await supabase.auth.getUser()
+          if (!currentUser) throw new Error("Utilisateur non connecté.")
+
+          const { error: resaveError } = await supabase.from('push_subscriptions').upsert({
+            user_id: currentUser.id,
+            device_endpoint: existing.endpoint,
+            subscription: existing.toJSON(),
+          }, { onConflict: 'device_endpoint' })
+
+          if (resaveError) throw resaveError
+
+          setStatus('✅ Cet appareil était déjà abonné : abonnement rafraîchi dans Supabase.')
+          return
+        }
+
+        await existing.unsubscribe()
+      }
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        applicationServerKey,
       })
 
       const { data: { user } } = await supabase.auth.getUser()

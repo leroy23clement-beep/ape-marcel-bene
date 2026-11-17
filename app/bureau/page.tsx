@@ -29,9 +29,27 @@ export default function BureauPage() {
         const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
         if (!vapidPublicKey) return
 
-        const subscription = await registration.pushManager.subscribe({
+        const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey)
+
+        // Le navigateur refuse un nouvel abonnement si un abonnement a été créé
+        // avec une autre clé VAPID ("A subscription with a different
+        // applicationServerKey already exists"). On réutilise l'abonnement
+        // existant s'il correspond à la clé actuelle, sinon on le supprime.
+        let existing = await registration.pushManager.getSubscription()
+        if (existing) {
+          const previous = new Uint8Array(existing.options.applicationServerKey ?? [])
+          const sameKey =
+            previous.length === applicationServerKey.length &&
+            previous.every((byte, index) => byte === applicationServerKey[index])
+          if (!sameKey) {
+            await existing.unsubscribe()
+            existing = null
+          }
+        }
+
+        const subscription = existing ?? await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+          applicationServerKey,
         })
 
         const subJson = subscription.toJSON()
